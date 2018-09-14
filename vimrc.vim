@@ -55,6 +55,6 @@ imap <S-Right> <Esc>v<Right>
 :map <C-f> /
 :map <F3> n
 
-"line editing
-:map <C-S-D> yyp "duplicate whole line
-:map <C-S-K> dd "delete while line
+"line editing (after familiar with vim, it became seldom used)
+":map <C-S-D> yyp "duplicate whole line
+":map <C-S-K> dd "delete while line
