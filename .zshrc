@@ -9,7 +9,7 @@ export ZSH=$HOME/.oh-my-zsh
 # load a random theme each time oh-my-zsh is loaded, in which case,
 # to know which specific one was loaded, run: echo $RANDOM_THEME
 # See https://github.com/robbyrussell/oh-my-zsh/wiki/Themes
-ZSH_THEME="powerlevel9k/powerlevel9k"
+ZSH_THEME="powerlevel9k/powerlevel9k" # "robbyrussell"
 
 # Set list of themes to pick from when loading at random
 # Setting this variable when ZSH_THEME="bullet-train" # random will cause zsh to load
@@ -63,7 +63,7 @@ ZSH_THEME="powerlevel9k/powerlevel9k"
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(zsh-syntax-highlighting zsh-autosuggestions rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(zsh-syntax-highlighting zsh-autosuggestions
+plugins=(zsh-syntax-highlighting zsh-autosuggestions 
   git
 )
 
@@ -98,10 +98,14 @@ source $ZSH/oh-my-zsh.sh
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 source /Users/alfons/.myconfig/zshrc
+source /Users/alfons/.myconfig/zshrc
 alias cdi="cd ~/Library/Mobile\ Documents/com~apple~CloudDocs" #cd to iCloud drive
 
 # POWERLINE THEME CONTENT
 # 左側
-POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(context dir dir_writable vcs )
+POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(context dir dir_writable )
 # 右側
-POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status ram load time)
+POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status ram battery time)
+
+POWERLEVEL9K_SHORTEN_DIR_LENGTH=1
+POWERLEVEL9K_PROMPT_ON_NEWLINE=true
