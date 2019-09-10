@@ -4,12 +4,13 @@ alias vim="mvim -v"
 
 # Path to your oh-my-zsh installation.
 export ZSH=$HOME/.oh-my-zsh
+export PATH=$PATH:/Users/alfons/Library/Python/3.7/bin
 
 # Set name of the theme to load --- if set to "random", it will
 # load a random theme each time oh-my-zsh is loaded, in which case,
 # to know which specific one was loaded, run: echo $RANDOM_THEME
 # See https://github.com/robbyrussell/oh-my-zsh/wiki/Themes
-ZSH_THEME="powerlevel9k/powerlevel9k" # "robbyrussell"
+ZSH_THEME="powerline" # "robbyrussell"
 
 # Set list of themes to pick from when loading at random
 # Setting this variable when ZSH_THEME="bullet-train" # random will cause zsh to load
@@ -100,12 +101,25 @@ source $ZSH/oh-my-zsh.sh
 source /Users/alfons/.myconfig/zshrc
 source /Users/alfons/.myconfig/zshrc
 alias cdi="cd ~/Library/Mobile\ Documents/com~apple~CloudDocs" #cd to iCloud drive
+alias gpp="git log --pretty=format:"%h%x09%an%x09%ad%x09%s""
+eval $(thefuck --alias)
 
-# POWERLINE THEME CONTENT
-# 左側
-POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(context dir dir_writable )
-# 右側
+# POWERLEVEL THEME CONTENT
+POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(context dir dir_writable vcs)
 POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status ram battery time)
 
 POWERLEVEL9K_SHORTEN_DIR_LENGTH=1
 POWERLEVEL9K_PROMPT_ON_NEWLINE=true
+
+# POWERLINE THEME CONTENT
+POWERLINE_RIGHT_A="exit-status-on-fail"
+POWERLINE_PATH="short"
+POWERLINE_DETECT_SSH="true"
+POWERLINE_GIT_CLEAN="✔"
+POWERLINE_GIT_DIRTY="✘"
+POWERLINE_GIT_ADDED="%F{green}✚%F{black}"
+POWERLINE_GIT_MODIFIED="%F{blue}✹%F{black}"
+POWERLINE_GIT_DELETED="%F{red}✖%F{black}"
+POWERLINE_GIT_UNTRACKED="%F{yellow}✭%F{black}"
+POWERLINE_GIT_RENAMED="➜"
+POWERLINE_GIT_UNMERGED="═"
