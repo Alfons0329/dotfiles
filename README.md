@@ -1,6 +1,4 @@
-# Unix_Configuration
-* My unix configuration for install unix-like system.
-* Actually, I am using# dotfiles
+# dotfiles
 
 * My UNIX-Like post OS installation scripts.
 
@@ -15,7 +13,7 @@
 |        |         |       |
 
 ## The `install.sh` will install the following packages and dependencies ()
-* Original install.sh credit to [toosyou](), and I forked from his for my own purpose.
+* Original install.sh credit to [toosyou](https://github.com/toosyou/myconfig), and I forked from his and modified for my own purpose.
 
 - [brew](https://brew.sh/) (macos only)
 - zsh  
@@ -32,7 +30,7 @@
     - [The ultimate Vim configuration: vimrc](https://github.com/amix/vimrc)  
     - [delimitMate](https://github.com/Raimondi/delimitMate)  
     - [YouCompleteMe](https://github.com/Valloric/YouCompleteMe)(with C-family languages support)
-- tmux  
+- oh-my-tmux  
     - mouse support  
     - [Tmux Plugin Manager](https://github.com/tmux-plugins/tpm) (tmux >= 2.3)  
     - [tmux-sensible](https://github.com/tmux-plugins/tmux-sensible) (tmux >= 2.3)  
@@ -44,6 +42,5 @@
 - python3
 - pip3
 
-## Install my own vimrcs and tmux configuraion
+## The `setup.sh` will install my own vimrcs and tmux configuraion
 * This will overwrite all your vimrc and tmux configurations!
-* Just do `bash install_rc.sh` macOS now partly because of the Apple eco system.
