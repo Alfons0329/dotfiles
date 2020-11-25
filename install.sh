@@ -30,7 +30,7 @@ if [ $is_sudoer -eq 1 ]; then
 	    for i in zsh mosh vim node install git wget python-dev python-pip python3-dev python3-pip nodejs xsel cmake; do
 	        sudo apt-get --yes --force-yes -f -m install $i
 	    done
-		
+
 		# install oh-my-tmux rather than original tmux
 		git clone https://github.com/gpakosz/.tmux.git
 
