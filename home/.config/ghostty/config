@@ -1,0 +1,63 @@
+# Ghostty configuration.
+# Deployed to ~/.config/ghostty/config by modules/60-desktop.sh.
+
+# Font. Roboto Mono for Powerline carries the glyphs the bullet-train zsh theme
+# and lualine's separators need; it is installed via packages/brew-cask.txt.
+font-family = Roboto Mono for Powerline
+font-size = 13
+
+# Window
+window-padding-x = 8
+window-padding-y = 8
+window-save-state = always
+
+# Option sends Esc+, which is what makes every Alt chord in Neovim reachable -
+# including the project-search key below.
+macos-option-as-alt = true
+
+# Keys
+#
+# Cmd+Shift+F is VSCode's "search across files", but macOS never delivers a Cmd
+# chord to a terminal program. Translate it here into ESC F (Alt+Shift+F), which
+# every terminal can transmit and which survives tmux over SSH - so the same
+# single Neovim mapping serves the Mac and the Linux build box.
+keybind = cmd+shift+f=text:\x1bF
+
+# Scrollback
+scrollback-limit = 10000
+
+# Colours: a dark 16-colour palette carried over from a long-standing iTerm2
+# profile, with the blue and red lifted so directory and error text stay
+# readable against pure black.
+background = #000000
+foreground = #bbbbbb
+cursor-color = #bbbbbb
+selection-background = #b4d5ff
+selection-foreground = #000000
+
+# ANSI 0-7 (normal)
+palette = 0=#000000
+palette = 1=#f15412
+palette = 2=#00bb00
+palette = 3=#bbbb00
+palette = 4=#4d9de0
+palette = 5=#bb00bb
+palette = 6=#00bbbb
+palette = 7=#bbbbbb
+
+# ANSI 8-15 (bright)
+palette = 8=#555555
+palette = 9=#ff5555
+palette = 10=#55ff55
+palette = 11=#ffff55
+palette = 12=#5555ff
+palette = 13=#ff55ff
+palette = 14=#55ffff
+palette = 15=#ffffff
+
+# Machine-local overrides, loaded last and ignored when absent (the `?` prefix).
+# This is where modules/70-ghostty.sh writes
+# `clipboard-paste-bracketed-safe-newline = true` after building the patched
+# Ghostty: the option does not exist in a stock build, and putting it in this
+# tracked file would make every unpatched install complain about an unknown key.
+config-file = ?ghostty-local.conf

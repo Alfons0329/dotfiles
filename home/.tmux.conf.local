@@ -42,7 +42,11 @@ tmux_conf_new_session_prompt=false
 # RGB 24-bit colour support (tmux >= 2.2), possible values are:
 #  - true
 #  - false (default)
-tmux_conf_theme_24b_colour=false
+#
+# On: every modern terminal (Ghostty, iTerm2, WezTerm, Windows Terminal) speaks
+# truecolor, and without it tmux quantises to 256 colours - which is why a
+# Neovim colorscheme looks washed out inside tmux but correct outside it.
+tmux_conf_theme_24b_colour=true
 
 # window style
 tmux_conf_theme_window_fg='default'
@@ -150,10 +154,16 @@ tmux_conf_theme_window_status_last_attr='none'
 # tmux_conf_theme_left_separator_sub='|'
 # tmux_conf_theme_right_separator_main=''
 # tmux_conf_theme_right_separator_sub='|'
-tmux_conf_theme_left_separator_main='\uE0B0'  # /!\ you don't need to install Powerline
-tmux_conf_theme_left_separator_sub='\uE0B1'   #   you only need fonts patched with
-tmux_conf_theme_right_separator_main='\uE0B2' #   Powerline symbols or the standalone
-tmux_conf_theme_right_separator_sub='\uE0B3'  #   PowerlineSymbols.otf font, see README.md
+# These need two things, and both failure modes look like a broken font:
+#   1. a powerline-patched font in the *terminal emulator* (the machine you sit
+#      at, not the box you SSH into) - otherwise you get tofu boxes;
+#   2. a UTF-8 locale in the shell that starts tmux - tmux renders every
+#      multibyte character as '_' when LANG/LC_ALL is unset or POSIX, so the
+#      separators come out as underscores. ~/.zshrc sets LANG for this reason.
+tmux_conf_theme_left_separator_main='\uE0B0'
+tmux_conf_theme_left_separator_sub='\uE0B1'
+tmux_conf_theme_right_separator_main='\uE0B2'
+tmux_conf_theme_right_separator_sub='\uE0B3'
 
 # status left/right content:
 #   - separate main sections with '|'
@@ -179,13 +189,26 @@ tmux_conf_theme_right_separator_sub='\uE0B3'  #   PowerlineSymbols.otf font, see
 #     - #{uptime_s}
 #     - #{username}
 #     - #{username_ssh}
-tmux_conf_theme_status_left=' ❐ #S | ↑#{?uptime_y, #{uptime_y}y,}#{?uptime_d, #{uptime_d}d,}#{?uptime_h, #{uptime_h}h,}#{?uptime_m, #{uptime_m}m,} '
-tmux_conf_theme_status_right='#{prefix}#{pairing}#{synchronized} #{?battery_status, #{battery_status},}#{?battery_bar, #{battery_bar},}#{?battery_percentage, #{battery_percentage},} , %R , %d %b | #{username}#{root} | #(curl wttr.in?format=3)'
+#
+# The layout, left to right:
+#
+#   [ ❐ session ]  1 window  2 window  3 window ...  [ prefix ][ time ][ user ]
+#
+# Session name on the left, the window list in the middle (drawn by tmux from
+# tmux_conf_theme_window_status_format above), clock and current user on the
+# right. The user segment is what tells a root shell from a normal one at a
+# glance - #{username} is the name and #{root} appends a blinking '!'.
+#
+# Deliberately absent: uptime, battery, and a `#(curl wttr.in)` shell-out. The
+# last one fires on every status refresh, so on a build machine behind a proxy
+# it either hangs the redraw or paints an error into the status bar.
+tmux_conf_theme_status_left=' ❐ #S '
+tmux_conf_theme_status_right='#{prefix}#{pairing}#{synchronized} , %R , #{username}#{root} '
 
 # status left style
-tmux_conf_theme_status_left_fg='#000000,#e4e4e4,#e4e4e4'  # black, white , white
-tmux_conf_theme_status_left_bg='#ffff00,#ff00af,#00afff'  # yellow, pink, white blue
-tmux_conf_theme_status_left_attr='bold,none,none'
+tmux_conf_theme_status_left_fg='#000000'                  # black
+tmux_conf_theme_status_left_bg='#ffff00'                  # yellow
+tmux_conf_theme_status_left_attr='bold'
 
 # status right style
 tmux_conf_theme_status_right_fg='#8a8a8a,#e4e4e4,#000000' # light gray, white, black
@@ -283,7 +306,12 @@ set -g mouse on
 # force Vi mode
 #   really you should export VISUAL or EDITOR environment variable, see manual
 #set -g status-keys vi
-#set -g mode-keys vi
+setw -g mode-keys vi
+
+# Keep the selection after a mouse drag instead of copying and exiting copy
+# mode immediately. Without this, releasing the mouse jumps straight back to
+# the prompt and you lose the selection before you can act on it.
+unbind -T copy-mode-vi MouseDragEnd1Pane
 
 # replace C-b by C-a instead of using both prefixes
 # set -gu prefix2
@@ -294,3 +322,24 @@ set -g mouse on
 
 # move status line to top
 #set -g status-position top
+
+# -- clipboard and paste -------------------------------------------------------
+
+# Let tmux write to the system clipboard via OSC 52, which is what makes copy
+# work over SSH without an X11 forwarding setup.
+set -g set-clipboard on
+
+# Advertise bracketed paste to programs running inside tmux. Without these
+# capabilities tmux strips the terminal's \e[200~ ... \e[201~ markers, so a
+# multi-line paste arrives as a series of bare newlines. In a modal editor
+# those become motions rather than text, and in strict TUI key parsers they
+# collapse the paste onto one line.
+set -ag terminal-overrides ",*:smBP=\\E[?2004h,*:rmBP=\\E[?2004l"
+
+# -- plugins -------------------------------------------------------------------
+
+# tmux-resurrect: save and restore sessions across reboots.
+#   prefix + Ctrl-s   save
+#   prefix + Ctrl-r   restore
+if '[ -f ~/.tmux/plugins/tmux-resurrect/resurrect.tmux ]' \
+   'run-shell ~/.tmux/plugins/tmux-resurrect/resurrect.tmux'

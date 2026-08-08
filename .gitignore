@@ -1,0 +1,20 @@
+# Local-only scratch material, not mine to publish. Never commit this.
+ref/
+
+# Machine-local shell config: secrets, tokens, work-specific aliases.
+# The tracked template is home/.zshrc.local.example
+home/.zshrc.local
+
+# Machine-local Ghostty config, written by modules/70-ghostty.sh. It holds
+# options that only exist in the patched build, which a stock Ghostty would
+# reject as unknown keys.
+home/.config/ghostty/ghostty-local.conf
+
+# Working notes and screenshots. The screenshots carry hostnames and container
+# IDs, so they stay out of a public repo.
+issue/
+
+# Backups created by install.sh when it replaces an existing file
+*.bak.*
+
+.DS_Store

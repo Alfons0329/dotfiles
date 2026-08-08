@@ -1,0 +1,30 @@
+# Homebrew formulae (macOS). One per line; '#' comments ignored.
+
+# shell + terminal
+zsh
+tmux
+
+# editors
+vim
+neovim
+
+# vcs + core cli
+git
+curl
+wget
+
+# search
+fzf
+the_silver_searcher
+ripgrep
+
+# viewing / formatting
+jq
+tig
+bat
+
+# runtime for Claude Code tooling and several language servers
+node
+
+# macOS power/thermal monitor for Apple Silicon
+asitop

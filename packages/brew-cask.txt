@@ -1,0 +1,11 @@
+# Homebrew casks (macOS GUI apps + fonts).
+# Skipped entirely under --minimal. Installed by modules/60-desktop.sh.
+
+# terminal emulator
+ghostty
+
+# powerline-patched font, required by the bullet-train zsh theme and lualine
+font-roboto-mono-for-powerline
+
+# menu-bar system monitor
+stats
