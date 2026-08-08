@@ -1,0 +1,32 @@
+# ~/.zshrc.local - machine-local shell configuration.
+#
+# install.sh copies this template to ~/.zshrc.local on first run and never
+# touches it again. ~/.zshrc sources it last, so anything here overrides the
+# tracked config.
+#
+# THIS FILE IS NOT TRACKED BY GIT. It is the only correct place for:
+#   - API tokens and credentials
+#   - employer-specific hosts, profiles, project paths
+#   - aliases that only make sense on this one machine
+#
+# Keeping them here is what stops a secret from ever reaching a public repo.
+# If you find yourself editing ~/.zshrc to add one of the above, stop and put
+# it here instead.
+
+# --- Credentials -----------------------------------------------------------
+# export SOME_API_TOKEN="..."
+# export SOME_SERVICE_EMAIL="you@example.com"
+
+# --- Work-specific ---------------------------------------------------------
+# export PATH="$HOME/work/toolchain/bin:$PATH"
+# alias deploy='...'
+# alias vpn='...'
+
+# --- Per-machine tweaks ----------------------------------------------------
+# Example: a build box where the default editor should stay plain vim.
+# export EDITOR=vim
+
+# Example: proxy settings for a corporate network.
+# export HTTP_PROXY="http://proxy.internal:8080"
+# export HTTPS_PROXY="$HTTP_PROXY"
+# export NO_PROXY="localhost,127.0.0.1"
