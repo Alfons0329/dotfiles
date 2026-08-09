@@ -48,6 +48,19 @@ tmux_conf_new_session_prompt=false
 # Neovim colorscheme looks washed out inside tmux but correct outside it.
 tmux_conf_theme_24b_colour=true
 
+# The setting above drives oh-my-tmux's own _apply_24b(), but that function
+# runs as a backgrounded job during startup and reads tmux_conf_theme_24b_colour
+# from an environment snapshot that is not reliably populated in time - verified
+# by hand in the test container: tmux_conf_theme_24b_colour was confirmed set in
+# tmux's global environment, yet terminal-overrides never gained the Tc entry on
+# a fresh session, 5/5 tries, even after a 2s wait. Set it directly instead: this
+# line is parsed synchronously as part of this file, so it does not race
+# anything. Without it, tmux treats the terminal as 256-colour-only and
+# down-quantises every 24-bit colour Neovim sends, which is what turns
+# tokyonight's muted palette into the harsh, saturated one from a plain 256-
+# colour approximation.
+set -ag terminal-overrides ",*256col*:Tc"
+
 # window style
 tmux_conf_theme_window_fg='default'
 tmux_conf_theme_window_bg='default'
