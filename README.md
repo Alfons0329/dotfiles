@@ -261,6 +261,22 @@ things, and both failure modes look identical — a row of boxes or underscores:
    which only PAM reads, so a container shell and plenty of SSH logins never see
    it. `.zshrc` sets `LANG` for exactly this reason.
 
+A third, separate failure mode looks different — not missing glyphs, but a
+Neovim colorscheme rendering in harsh, saturated primary colours instead of its
+real palette (tokyonight's muted blue-greys becoming near-black with bright
+blue/red/green, for example). Neovim always emits 24-bit colour
+(`termguicolors` is hard-set); the fidelity loss happens in tmux, which
+down-quantises to 256 colours unless it believes the terminal it is inside
+supports truecolor. `home/.tmux.conf.local` declares that directly with
+`set -ag terminal-overrides ",*256col*:Tc"` rather than through oh-my-tmux's
+own `tmux_conf_theme_24b_colour` auto-detection — that logic runs as a
+backgrounded startup job and was confirmed, by hand in the Docker test
+container, to not reliably see the setting in time, 5/5 tries, even after a 2
+second wait. Separately, `.zshrc` exports `COLORTERM=truecolor` unconditionally,
+because `docker exec -it` / `docker run -it` do not forward host environment
+variables the way a real terminal or SSH session does, so a container shell
+never sees what the host terminal actually supports on its own.
+
 The tmux status bar reads: session name on the left, the window list in the
 middle, and the clock plus the current user on the right — `#{root}` appends a
 blinking `!` so a root shell is obvious.
