@@ -7,16 +7,28 @@ if [ -z "${DOTFILES_ROOT:-}" ]; then
     source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/core.sh"
 fi
 
-# Pinned rather than "latest" on purpose.
+# Pinned rather than "latest" on purpose, and specifically NOT 0.12.
 #
 # Neovim's release binaries are built against whatever glibc their CI image
 # ships. Probing a real ubuntu:22.04 container (glibc 2.35) showed:
 #   v0.10.4            fails - requires GLIBC_2.38
 #   v0.11.0 .. v0.12.4 run clean
-# so the usable floor on 22.04 is v0.11.0, which also happens to be blink.cmp's
-# minimum. Override with NVIM_VERSION=... (accepts a tag or "latest") after
-# checking the target machine's glibc.
-: "${NVIM_VERSION:=v0.12.4}"
+# so the glibc floor on 22.04 is v0.11.0, which also happens to be blink.cmp's
+# minimum. But 0.12 changed the treesitter query-predicate API so `match[id]`
+# returns a list of nodes instead of a single node, and nvim-treesitter's
+# `master` branch (pinned deliberately - see the treesitter plugin spec in
+# lua/plugins/editor.lua - `main` deleted the module this config needs) was
+# never updated for it: reproduced by hand, 100% - any bash heredoc or a
+# markdown fenced code block crashes the decoration provider on open with
+# "attempt to call method 'range' (a nil value)" in query_predicates.lua,
+# which then leaves that buffer with no syntax highlighting for the rest of
+# the session. Upstream closed both reports "not planned"
+# (neovim/neovim#39032, nvim-treesitter/nvim-treesitter#8636) since active
+# nvim-treesitter development moved to `main`. Staying on the last 0.11.x
+# release sidesteps the incompatibility entirely instead of patching vendored
+# plugin code. Override with NVIM_VERSION=... (accepts a tag or "latest")
+# after checking the target machine's glibc.
+: "${NVIM_VERSION:=v0.11.7}"
 NVIM_MIN_MINOR=11
 
 nvim_asset_arch() {
@@ -166,6 +178,32 @@ report_treesitter_parsers() {
     step "the rest build on first use of each filetype (auto_install)"
 }
 
+# Give the still-missing parsers a head start in the background, detached from
+# this script, so they are more likely to be done before anyone actually opens
+# nvim. Without this, whichever parser is missing for the FIRST file you open
+# gets compiled twice at once: nvim-treesitter's ensure_installed runs once for
+# the whole configured list at plugin setup, and its auto_install hook
+# independently, unconditionally tries to install the current buffer's own
+# language too - the two race on the same temp directory (reproduced by hand:
+# "mkdir: cannot create directory 'tree-sitter-bash-tmp': File exists", every
+# time, opening any not-yet-compiled filetype). The parser still ends up
+# correct once the dust settles, but if that race lands mid-redraw it can throw
+# from Neovim's decoration provider and leave the buffer with no highlighting
+# for the rest of that session - which looks exactly like a broken colorscheme
+# and is what motivated this. This does not close the race (nvim-treesitter's
+# own logic, not ours), it just makes it far less likely to be hit at all by
+# giving the compile a few minutes' head start before a human gets to it.
+warm_treesitter_parsers() {
+    [ "$DRY_RUN" = "1" ] && return 0
+    have nvim || return 0
+
+    log "Warming remaining treesitter parsers in the background..."
+    nohup nvim --headless \
+        "+lua require('nvim-treesitter.install').ensure_installed_sync(vim.g.dotfiles_ts_parsers)" \
+        +qa >/tmp/dotfiles-treesitter-warm.log 2>&1 &
+    disown
+}
+
 # Language servers install by default - without them nothing in the editor
 # completes, jumps to a definition, or renames a symbol, which is most of the
 # point. They are still the largest and most network-dependent step, so a
@@ -197,6 +235,7 @@ main() {
     sync_plugins
     report_treesitter_parsers
     install_lsp_servers
+    warm_treesitter_parsers
 }
 
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then

@@ -94,6 +94,10 @@ check "interactive shell has a UTF-8 locale" \
 # Ctrl+S must reach the editor rather than being eaten as XOFF.
 check "flow control disabled (Ctrl+S usable)" \
       "grep -q 'stty -ixon' $HOME/.zshrc"
+# `docker exec -it` / `docker run -it` do not forward the host's environment,
+# so a real terminal's COLORTERM never reaches a container shell on its own.
+check "COLORTERM exported" \
+      "zsh -ic 'echo \$COLORTERM' 2>/dev/null | grep -qi truecolor"
 
 # ------------------------------------------------------------------
 section "tmux"
@@ -112,6 +116,16 @@ check "tmux config parses"      "tmux -f $HOME/.tmux.conf new-session -d -s veri
 # things that were removed. The wttr.in check matters most - that was a shell-out
 # firing on every status refresh, which hangs the redraw behind a proxy.
 check "24-bit colour enabled"   "grep -q '^tmux_conf_theme_24b_colour=true' $HOME/.tmux.conf.local"
+# The line above only proves the setting exists in the file - it passed the
+# whole time this was broken. oh-my-tmux's own 24-bit logic (_apply_24b) runs
+# as a backgrounded startup job and was verified, by hand in this container, to
+# not reliably pick up tmux_conf_theme_24b_colour in time: terminal-overrides
+# never gained the Tc entry on a fresh session, 5/5 tries. So this asserts the
+# actual behaviour a real session depends on - that a freshly started tmux
+# server declares truecolor support for 256-colour terminal types - not just
+# that the line requesting it is present.
+check "tmux truecolor actually applied to a live session" \
+      "tmux new-session -d -s verify_24b && tmux show -g terminal-overrides | grep -Eq '256col.*:Tc' && tmux kill-session -t verify_24b"
 check "status left is the session name only" \
       "grep -q '^tmux_conf_theme_status_left=.*#S' $HOME/.tmux.conf.local && ! grep -q '^tmux_conf_theme_status_left=.*uptime' $HOME/.tmux.conf.local"
 check "status right has clock + user" \

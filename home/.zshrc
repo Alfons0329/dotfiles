@@ -25,6 +25,14 @@ fi
 # program in the foreground, which is how the Neovim save mapping works.
 [[ -t 0 ]] && stty -ixon 2>/dev/null
 
+# Ghostty, iTerm2 and WezTerm all export this themselves, but `docker exec -it`
+# and `docker run -it` do not forward the host's environment - only $TERM - so a
+# container shell never sees it even when the real terminal supports truecolor.
+# Tools that gate 24-bit colour on this var (bat, delta, fzf's preview) would
+# otherwise silently downgrade inside a container.
+: "${COLORTERM:=truecolor}"
+export COLORTERM
+
 export ZSH="$HOME/.oh-my-zsh"
 
 # bullet-train lives in $ZSH_CUSTOM/themes and needs a powerline-patched font
