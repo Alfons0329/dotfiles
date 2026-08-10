@@ -48,11 +48,20 @@ return {
                 options = {
                     theme = theme,
                     globalstatus = true, -- pairs with laststatus=3
-                    -- Powerline separators, matching the tmux status bar. These
-                    -- need a patched font in the terminal emulator; without one
-                    -- they show as tofu boxes.
-                    component_separators = { left = "", right = "" },
-                    section_separators = { left = "", right = "" },
+                    -- Powerline separators, matching the tmux status bar, which
+                    -- names the same four codepoints at .tmux.conf.local's
+                    -- tmux_conf_theme_*_separator_* settings.
+                    --
+                    -- Written as \u{} escapes rather than pasted literally: as
+                    -- literals these are unprintable private-use-area bytes, and
+                    -- they silently vanished once already - this file shipped
+                    -- `left = "", right = ""` under this very comment, which is
+                    -- why the statusline rendered as flat rectangles instead of
+                    -- arrows. An escape is visible in a diff; a lost PUA byte is
+                    -- not. They still need a patched font in the terminal
+                    -- emulator, or they show as tofu boxes.
+                    component_separators = { left = "\u{e0b1}", right = "\u{e0b3}" },
+                    section_separators = { left = "\u{e0b0}", right = "\u{e0b2}" },
                     disabled_filetypes = { statusline = { "NvimTree" } },
                 },
                 sections = {

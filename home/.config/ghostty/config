@@ -1,10 +1,19 @@
 # Ghostty configuration.
 # Deployed to ~/.config/ghostty/config by modules/60-desktop.sh.
 
-# Font. Roboto Mono for Powerline carries the glyphs the bullet-train zsh theme
-# and lualine's separators need; it is installed via packages/brew-cask.txt.
-font-family = Roboto Mono for Powerline
-font-size = 13
+# Font. The Nerd Font build rather than the plain Powerline one: both carry the
+# separator glyphs the bullet-train zsh theme and lualine need, but only the
+# Nerd Font build has the devicons nvim-web-devicons draws in the statusline and
+# file tree. Ghostty papers over the difference by falling back to any other
+# installed font for a missing glyph; iTerm2 does not, and rendered those icons
+# as [?] boxes. Same typeface either way. Installed via packages/brew-cask.txt.
+#
+# The "Mono" variant specifically: Nerd Fonts ships each patched face three
+# ways, and only that one draws every icon inside a single cell. The others let
+# a wide glyph spill into the neighbouring column, which shifts everything after
+# it on that row.
+font-family = RobotoMono Nerd Font Mono
+font-size = 15
 
 # Window
 window-padding-x = 8
@@ -26,37 +35,33 @@ keybind = cmd+shift+f=text:\x1bF
 # Scrollback
 scrollback-limit = 10000
 
-# Colours: a dark 16-colour palette carried over from a long-standing iTerm2
-# profile, with the blue and red lifted so directory and error text stay
-# readable against pure black.
-background = #000000
-foreground = #bbbbbb
-cursor-color = #bbbbbb
-selection-background = #b4d5ff
-selection-foreground = #000000
+# Colours. One theme name instead of sixteen hand-maintained palette lines:
+# Ghostty ships TokyoNight Night as a built-in whose palette is exactly the one
+# Neovim's colorscheme uses, so `ls`, git and grep output stop clashing with the
+# editor sitting in the same window. The equivalent palette is spelled out
+# per-channel in the iTerm2 dynamic profile, which has no theme concept.
+#
+# This also retires a real problem rather than papering over it. `ls` marks
+# directories with SGR 01;34 - bold blue - and a terminal either maps bold onto
+# the bright palette or leaves it on the normal one, which is why directories
+# came out light blue in iTerm2 (Use Bright Bold = True) and a much darker blue
+# in Ghostty. In tokyonight-night the bright and normal entries are identical
+# for colours 1-6 (palette 12 == palette 4 == #7aa2f7), so the two terminals
+# agree whichever way they resolve bold.
+theme = TokyoNight Night
 
-# ANSI 0-7 (normal)
-palette = 0=#000000
-palette = 1=#f15412
-palette = 2=#00bb00
-palette = 3=#bbbb00
-palette = 4=#4d9de0
-palette = 5=#bb00bb
-palette = 6=#00bbbb
-palette = 7=#bbbbbb
-
-# ANSI 8-15 (bright)
-palette = 8=#555555
-palette = 9=#ff5555
-palette = 10=#55ff55
-palette = 11=#ffff55
-palette = 12=#5555ff
-palette = 13=#ff55ff
-palette = 14=#55ffff
-palette = 15=#ffffff
+# Match the iTerm2 profile's Use Bright Bold, so bold text on colours 0/7 - the
+# two the theme does differentiate - renders the same in both terminals.
+# `bold-is-bright` is the old spelling and is deprecated as of Ghostty 1.2.
+bold-color = bright
 
 # Machine-local overrides, loaded last and ignored when absent (the `?` prefix).
-# This is where modules/70-ghostty.sh writes
+# Last setting wins, so this is also where a machine picks a different look
+# without touching a tracked file - `theme = Catppuccin Mocha`, a font size, an
+# individual `palette = 4=...`. Same arrangement as ~/.zshrc.local, and the
+# counterpart of ~/.tmux.conf.user and nvim's lua/config/local.lua.
+#
+# It is also where modules/70-ghostty.sh writes
 # `clipboard-paste-bracketed-safe-newline = true` after building the patched
 # Ghostty: the option does not exist in a stock build, and putting it in this
 # tracked file would make every unpatched install complain about an unknown key.

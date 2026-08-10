@@ -88,8 +88,12 @@ set_iterm_default_profile() {
     warn "iTerm2 kept its own default profile; setting the font on that instead."
     local plist="$HOME/Library/Preferences/com.googlecode.iterm2.plist"
     [ -f "$plist" ] || return 0
+    # PostScript name, not the family name - that is the form iTerm2 stores.
+    # "RobotoMonoNFM" carries no -Regular suffix; it was read out of the name
+    # table of RobotoMonoNerdFontMono-Regular.ttf rather than guessed, because a
+    # wrong name here fails silently by falling back to Monaco.
     /usr/libexec/PlistBuddy \
-        -c "Set :'New Bookmarks':0:'Normal Font' RobotoMonoForPowerline-Regular 14" \
+        -c "Set :'New Bookmarks':0:'Normal Font' RobotoMonoNFM 15" \
         "$plist" 2>/dev/null \
         || warn "Could not set the iTerm2 font; do it in Preferences > Profiles > Text."
 }
