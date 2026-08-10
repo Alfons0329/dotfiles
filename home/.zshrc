@@ -25,6 +25,31 @@ fi
 # program in the foreground, which is how the Neovim save mapping works.
 [[ -t 0 ]] && stty -ixon 2>/dev/null
 
+# Ghostty sets TERM=xterm-ghostty, an entry that ships only inside Ghostty.app -
+# it is not in Ubuntu 22.04's terminfo database and not in this repo's own
+# container, so every ssh or docker session opened from Ghostty starts on a TERM
+# nothing downstream can look up. Docker is worse: `docker run -t` hardcodes
+# TERM=xterm no matter what the host had (verified - passing TERM=xterm-ghostty
+# in the caller's environment still yields xterm inside), and xterm's terminfo
+# declares colors#8.
+#
+# Either way tmux then flattens Neovim's 24-bit colours - and its own hex-styled
+# status bar - down onto the terminal's basic 8-colour palette. That is the
+# whole reason one tmux session looked correct viewed from iTerm2 and wrong
+# viewed from Ghostty two minutes later: sampling the pixels, the status segment
+# styled '#00afff' came out as #00b2ff in iTerm2 and as #2743c7 - ANSI palette 4
+# - in Ghostty.
+#
+# This runs before the COLORTERM default below so that guard still sees whatever
+# the outer terminal really exported.
+if (( $+commands[infocmp] )); then
+    if ! infocmp -- "$TERM" &>/dev/null; then
+        export TERM=xterm-256color
+    elif [[ $TERM == xterm ]]; then
+        export TERM=xterm-256color
+    fi
+fi
+
 # Ghostty, iTerm2 and WezTerm all export this themselves, but `docker exec -it`
 # and `docker run -it` do not forward the host's environment - only $TERM - so a
 # container shell never sees it even when the real terminal supports truecolor.

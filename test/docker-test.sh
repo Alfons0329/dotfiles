@@ -39,7 +39,14 @@ echo "==> Build succeeded: install.sh and verify.sh both passed."
 
 if [ "$SHELL_AFTER" = "1" ]; then
     echo "==> Starting an interactive shell (expect a bullet-train zsh prompt)."
-    exec docker run --rm -it "$IMAGE"
+    # -e TERM because `docker run -t` otherwise hardcodes TERM=xterm inside the
+    # container - not the host's TERM, and not overridable from the outside
+    # environment - and xterm's terminfo declares colors#8. tmux then flattens
+    # everything Neovim sends onto the terminal's 8-colour ANSI palette, which
+    # is what made this container's colours look broken from Ghostty. .zshrc
+    # repairs it for interactive shells; this makes it right from PID 1, so a
+    # `sh -c` in here behaves the same as a login.
+    exec docker run --rm -it -e TERM=xterm-256color "$IMAGE"
 fi
 
 echo

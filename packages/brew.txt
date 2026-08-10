@@ -5,8 +5,11 @@ zsh
 tmux
 
 # editors
+# neovim is NOT here on purpose - Homebrew's version floats onto whatever is
+# currently stable, which has already shipped a Neovim 0.12.x that crashes on
+# this config (see modules/30-editor.sh). It's installed from a pinned GitHub
+# release tarball instead, same as Linux.
 vim
-neovim
 
 # vcs + core cli
 git

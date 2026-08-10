@@ -4,7 +4,15 @@
 # terminal emulator
 ghostty
 
-# powerline-patched font, required by the bullet-train zsh theme and lualine
+# Fonts. Both terminals are configured to use the Nerd Font build: it carries
+# the powerline separators the bullet-train zsh theme and lualine need *and* the
+# devicons nvim-web-devicons draws, which the plain Powerline build lacks.
+# Ghostty hid that gap by falling back to another installed font for a missing
+# glyph; iTerm2 does not, and drew those icons as [?] boxes.
+#
+# The Powerline build stays because bullet-train and older configs name it
+# directly, and it is a small download.
+font-roboto-mono-nerd-font
 font-roboto-mono-for-powerline
 
 # menu-bar system monitor
