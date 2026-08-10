@@ -99,6 +99,21 @@ check "flow control disabled (Ctrl+S usable)" \
 check "COLORTERM exported" \
       "zsh -ic 'echo \$COLORTERM' 2>/dev/null | grep -qi truecolor"
 
+# TERM normalisation. Two separate real failures, one check each.
+#
+# Ghostty sets TERM=xterm-ghostty, an entry that ships only inside Ghostty.app -
+# it is in neither Ubuntu 22.04's terminfo database nor this container's, so ssh
+# and docker sessions opened from Ghostty land on a TERM nothing can look up.
+# Any unknown value stands in for it here; naming xterm-ghostty specifically
+# would pass on a machine that happened to have it and prove nothing.
+check "unknown TERM falls back to a usable entry" \
+      "TERM=not-a-real-terminal zsh -ic 'echo \$TERM' 2>/dev/null | tr -d '\\r' | grep -qx xterm-256color"
+# And `docker run -t` hardcodes TERM=xterm regardless of the host's TERM -
+# verified by experiment. xterm's terminfo declares colors#8, which is what
+# collapsed a 24-bit Neovim into the terminal's 8-colour ANSI palette.
+check "docker's bare TERM=xterm is upgraded" \
+      "TERM=xterm zsh -ic 'echo \$TERM' 2>/dev/null | tr -d '\\r' | grep -qx xterm-256color"
+
 # ------------------------------------------------------------------
 section "tmux"
 # ------------------------------------------------------------------
@@ -126,6 +141,43 @@ check "24-bit colour enabled"   "grep -q '^tmux_conf_theme_24b_colour=true' $HOM
 # that the line requesting it is present.
 check "tmux truecolor actually applied to a live session" \
       "tmux new-session -d -s verify_24b && tmux show -g terminal-overrides | grep -Eq '256col.*:Tc' && tmux kill-session -t verify_24b"
+# The check above still only covers terminals whose TERM contains "256col".
+# That pattern matches xterm-256color and nothing else in play: not
+# xterm-ghostty, not the bare "xterm" docker hands out. Declaring RGB for "*"
+# is what makes truecolor independent of what the terminal calls itself, and
+# that is the fix for the same tmux session looking right from iTerm2 and
+# 8-colour from Ghostty. terminal-features needs tmux >= 3.2 (22.04 ships 3.2a).
+check "tmux declares RGB for any terminal name" \
+      "tmux new-session -d -s verify_rgb && tmux show -g terminal-features | grep -q '[*]:RGB' && tmux kill-session -t verify_rgb"
+# ~/.tmux.conf.user is the machine-local override hook, and whether it wins is
+# purely a question of oh-my-tmux's ordering. Sourcing it from .tmux.conf.local
+# looked obviously correct and was wrong: _apply_configuration() runs afterwards
+# and overwrites every style option, so a user file setting bg=#040506 lost to
+# the theme. It is loaded from a session-created hook instead. Assert the
+# outcome against a live server rather than grepping for the hook line - the
+# grep would have passed just as happily with the broken version.
+#
+# Runs in a subshell: check() eval's this string in the current shell, so a bare
+# `exit` would take verify.sh down with it rather than failing one check.
+check "machine-local tmux.conf.user overrides win over the theme" \
+      "$(cat <<'TMUXUSER'
+      (
+        _bak=""
+        if [ -e "$HOME/.tmux.conf.user" ]; then
+            _bak="$HOME/.tmux.conf.user.verify-bak"
+            mv "$HOME/.tmux.conf.user" "$_bak"
+        fi
+        printf 'set -g status-style "fg=#010203,bg=#040506"\n' > "$HOME/.tmux.conf.user"
+        tmux -f "$HOME/.tmux.conf" new-session -d -s verify_user
+        sleep 2
+        _got="$(tmux show -gv status-style 2>/dev/null)"
+        tmux kill-session -t verify_user 2>/dev/null
+        rm -f "$HOME/.tmux.conf.user"
+        [ -n "$_bak" ] && mv "$_bak" "$HOME/.tmux.conf.user"
+        case "$_got" in *040506*) exit 0 ;; *) exit 1 ;; esac
+      )
+TMUXUSER
+)"
 check "status left is the session name only" \
       "grep -q '^tmux_conf_theme_status_left=.*#S' $HOME/.tmux.conf.local && ! grep -q '^tmux_conf_theme_status_left=.*uptime' $HOME/.tmux.conf.local"
 check "status right has clock + user" \
@@ -186,6 +238,21 @@ check "treesitter auto_install enabled" \
 # assertion is deterministic rather than a race.
 check "lualine owns the statusline" \
       "nvim --headless -c 'lua require(\"lazy\").load({plugins={\"lualine.nvim\"}}); io.write(vim.o.statusline or \"\")' -c qa 2>&1 | grep -q lualine"
+# This file once shipped `section_separators = { left = "", right = "" }`
+# directly beneath a comment describing them as powerline separators - the
+# glyphs had been lost and the statusline rendered as flat rectangles. Grepping
+# ui.lua could not catch that: the word "Powerline" is right there in the
+# comment, which is failure mode 2 in CLAUDE.md.
+#
+# So render the thing and look at the output. Two details that are not
+# obvious: the buffer must be a real file (a headless nvim with no buffer
+# renders nothing useful), and vim.o.statusline is only ever
+# "%#lualine_transparent#" under --headless because lualine treats an
+# unfocused window as transparent - measured. lualine.statusline(true) asks it
+# for the focused rendering directly. \238\130\176 is U+E0B0 in UTF-8, written
+# as decimal escapes because bash 3.2 (what macOS ships) has no \u in $'...'.
+check "lualine renders powerline separators" \
+      "nvim --headless -c 'edit $HOME/.config/nvim/init.lua' -c 'lua require(\"lazy\").load({plugins={\"lualine.nvim\"}}); local s=vim.api.nvim_eval_statusline(require(\"lualine\").statusline(true),{winid=0}).str; io.write(tostring(s:find(\"\\238\\130\\176\",1,true)~=nil))' -c qa 2>&1 | grep -q true"
 check "colorscheme is tokyonight" \
       "nvim --headless -c 'lua io.write(vim.g.colors_name or \"\")' -c qa 2>&1 | grep -q tokyonight"
 # "I cannot see the cursorline" was a real complaint; assert it has a background.

@@ -201,6 +201,29 @@ that is the signal to put it in `~/.zshrc.local` instead. `test/verify.sh`
 enforces this by failing if anything resembling an exported credential appears
 in `~/.zshrc`.
 
+The other three tools follow the same pattern. Each file is optional, absent by
+default, gitignored, loaded last, and never touched by the installer:
+
+| Tool | File | Holds |
+|---|---|---|
+| zsh | `~/.zshrc.local` | shell config, secrets |
+| tmux | `~/.tmux.conf.user` | tmux commands, e.g. `set -g status-style ...` |
+| Neovim | `~/.config/nvim/lua/config/local.lua` | any Lua, e.g. `vim.cmd.colorscheme(...)` |
+| Ghostty | `~/.config/ghostty/ghostty-local.conf` | Ghostty settings, e.g. `theme = Catppuccin Mocha` |
+
+Use these to deviate on one machine rather than editing a tracked file — the
+tracked ones are symlinks into this repo, so editing them dirties your checkout
+and gets overwritten on the next pull.
+
+Two caveats worth knowing:
+
+- `~/.tmux.conf.user` takes tmux **commands**, not oh-my-tmux's
+  `tmux_conf_theme_*` variables. Those are read out of `.tmux.conf.local`
+  specifically, so setting one anywhere else does nothing.
+- Neovim's `local.lua` is the one file that lives *inside* the repo
+  (`~/.config/nvim` is a single symlink to `home/.config/nvim`). It is
+  gitignored, but it will show up in that directory rather than in `$HOME`.
+
 ## Neovim
 
 `NVIM_VERSION` is pinned rather than tracking `latest`, because Neovim's release
@@ -253,8 +276,12 @@ The powerline glyphs in the tmux status bar and the zsh prompt need **two**
 things, and both failure modes look identical — a row of boxes or underscores:
 
 1. **A patched font in the terminal emulator** — the machine you sit at, not the
-   box you SSH into. `font-roboto-mono-for-powerline` is installed on macOS and
-   set as the default in both the Ghostty config and the iTerm2 profile.
+   box you SSH into. `font-roboto-mono-nerd-font` is installed on macOS and set
+   as the default in both the Ghostty config and the iTerm2 profile. It is the
+   Nerd Font build rather than the plain Powerline one because Neovim's
+   statusline and file tree also draw devicons, which the Powerline build does
+   not carry — Ghostty hides that by falling back to another installed font for
+   a missing glyph, iTerm2 does not and draws `[?]` boxes.
 2. **A UTF-8 locale in the shell that starts tmux.** tmux substitutes `_` for
    every multibyte character when `LANG`/`LC_ALL` is unset or `POSIX`, and
    `update-locale` alone does not fix it: that writes `/etc/default/locale`,
@@ -263,19 +290,43 @@ things, and both failure modes look identical — a row of boxes or underscores:
 
 A third, separate failure mode looks different — not missing glyphs, but a
 Neovim colorscheme rendering in harsh, saturated primary colours instead of its
-real palette (tokyonight's muted blue-greys becoming near-black with bright
-blue/red/green, for example). Neovim always emits 24-bit colour
-(`termguicolors` is hard-set); the fidelity loss happens in tmux, which
-down-quantises to 256 colours unless it believes the terminal it is inside
-supports truecolor. `home/.tmux.conf.local` declares that directly with
-`set -ag terminal-overrides ",*256col*:Tc"` rather than through oh-my-tmux's
-own `tmux_conf_theme_24b_colour` auto-detection — that logic runs as a
-backgrounded startup job and was confirmed, by hand in the Docker test
-container, to not reliably see the setting in time, 5/5 tries, even after a 2
-second wait. Separately, `.zshrc` exports `COLORTERM=truecolor` unconditionally,
-because `docker exec -it` / `docker run -it` do not forward host environment
-variables the way a real terminal or SSH session does, so a container shell
-never sees what the host terminal actually supports on its own.
+real palette. The giveaway is that it is **terminal-dependent**: the same tmux
+session looks right attached from one terminal and wrong from another.
+
+Neovim always emits 24-bit colour (`termguicolors` is hard-set). The loss
+happens in tmux, which down-quantises unless it believes the terminal it is
+inside supports truecolor — and tmux decides that from the terminal's terminfo
+entry, looked up by `$TERM`. Two things break that:
+
+- **The terminal has no terminfo entry at all.** Ghostty sets
+  `TERM=xterm-ghostty`, which ships only inside `Ghostty.app`. It is not in
+  Ubuntu 22.04's database, so every SSH or `docker` session opened from Ghostty
+  starts on a `$TERM` nothing downstream can resolve.
+- **`docker run -t` hardcodes `TERM=xterm`**, regardless of the host's `$TERM`
+  and not overridable from the outside environment. `xterm`'s terminfo declares
+  `colors#8`, so everything collapses onto the terminal's 8-colour ANSI palette.
+
+`.zshrc` repairs both: an unresolvable `$TERM`, or a bare `xterm`, is upgraded
+to `xterm-256color`. `home/.tmux.conf.local` then declares truecolor with
+`set -as terminal-features ",*:RGB"` — by capability, not by terminal *name*.
+An earlier version used `terminal-overrides ",*256col*:Tc"`, which can only ever
+match a terminal whose `$TERM` contains `256col`; that matched `xterm-256color`
+and nothing else in play, which is exactly why the two terminals disagreed. The
+`Tc` line stays for tmux < 3.2, which has no `terminal-features`.
+
+Both are declared directly rather than through oh-my-tmux's own
+`tmux_conf_theme_24b_colour` auto-detection: that logic runs as a backgrounded
+startup job and was confirmed, by hand in the Docker test container, to not
+reliably see the setting in time — 5/5 tries, even after a 2 second wait.
+Separately, `.zshrc` exports `COLORTERM=truecolor` unconditionally, because
+`docker exec -it` / `docker run -it` do not forward host environment variables
+the way a real terminal or SSH session does.
+
+Both terminals are themed **tokyonight**, matching Neovim, so `ls`, `git` and
+`grep` output no longer clash with the editor in the same window. Ghostty uses
+its built-in `TokyoNight Night`; the iTerm2 dynamic profile spells the same
+palette out per channel, since iTerm2 has no theme concept. To use something
+else on one machine, see the override files above.
 
 The tmux status bar reads: session name on the left, the window list in the
 middle, and the clock plus the current user on the right — `#{root}` appends a

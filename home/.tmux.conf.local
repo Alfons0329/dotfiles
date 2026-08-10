@@ -48,17 +48,29 @@ tmux_conf_new_session_prompt=false
 # Neovim colorscheme looks washed out inside tmux but correct outside it.
 tmux_conf_theme_24b_colour=true
 
-# The setting above drives oh-my-tmux's own _apply_24b(), but that function
-# runs as a backgrounded job during startup and reads tmux_conf_theme_24b_colour
-# from an environment snapshot that is not reliably populated in time - verified
-# by hand in the test container: tmux_conf_theme_24b_colour was confirmed set in
-# tmux's global environment, yet terminal-overrides never gained the Tc entry on
-# a fresh session, 5/5 tries, even after a 2s wait. Set it directly instead: this
-# line is parsed synchronously as part of this file, so it does not race
-# anything. Without it, tmux treats the terminal as 256-colour-only and
-# down-quantises every 24-bit colour Neovim sends, which is what turns
-# tokyonight's muted palette into the harsh, saturated one from a plain 256-
-# colour approximation.
+# The setting above drives oh-my-tmux's own _apply_24b(), but that function runs
+# as a backgrounded job during startup and reads tmux_conf_theme_24b_colour from
+# an environment snapshot that is not reliably populated in time - verified by
+# hand in the test container: the variable was confirmed set in tmux's global
+# environment, yet terminal-overrides never gained the Tc entry on a fresh
+# session, 5/5 tries, even after a 2s wait. So declare it here instead, where it
+# is parsed synchronously as part of this file and races nothing.
+#
+# Declare it by *capability*, not by terminal name. The first version of this
+# fix was `terminal-overrides ",*256col*:Tc"`, which only ever matches a terminal
+# whose TERM contains "256col" - true of xterm-256color, false of xterm-ghostty
+# and false of the bare "xterm" that `docker run -t` hardcodes. That is why the
+# same tmux session rendered correctly in iTerm2 and in 8 colours in Ghostty:
+# pixel-sampling the two captures, the status segment styled '#00afff' below
+# came out as #00b2ff in one and as #2743c7 - the terminal's ANSI palette 4 - in
+# the other. terminal-features (tmux >= 3.2, which is Ubuntu 22.04's version)
+# takes a pattern too, but "*" here means every terminal, not every terminal
+# someone remembered to name. The Tc line stays for tmux < 3.2, where
+# terminal-features does not exist.
+#
+# ~/.zshrc separately upgrades a TERM that has no terminfo entry at all; without
+# that, nothing downstream of Ghostty on a Linux box can look its terminal up.
+set -as terminal-features ",*:RGB"
 set -ag terminal-overrides ",*256col*:Tc"
 
 # window style
@@ -70,9 +82,22 @@ tmux_conf_theme_window_bg='default'
 #   - false (default)
 tmux_conf_theme_highlight_focused_pane=false
 
+# Every colour from here down is tokyonight-night, the same palette Neovim's
+# colorscheme and both terminal emulators use, so the status bar stops being a
+# differently-themed strip under the editor. The trailing comment on each line
+# names the palette entry rather than the colour, because "light blue" was true
+# of #00afff and is not true of its replacement - a stale colour name is how
+# these drift. Reference values: bg #1a1b26, bg_dark #16161e, bg_highlight
+# #292e42, fg #c0caf5, fg_dark #a9b1d6, gutter #3b4261, blue #7aa2f7,
+# red #f7768e, yellow #e0af68.
+#
+# To use something else on one machine, override in ~/.tmux.conf.user (see the
+# end of this file) rather than editing here - this file is a symlink into the
+# dotfiles repo.
+
 # focused pane colours:
 tmux_conf_theme_focused_pane_fg='default'
-tmux_conf_theme_focused_pane_bg='#0087d7'               # light blue
+tmux_conf_theme_focused_pane_bg='#292e42'               # bg_highlight
 
 # pane border style, possible values are:
 #   - thin (default)
@@ -80,31 +105,31 @@ tmux_conf_theme_focused_pane_bg='#0087d7'               # light blue
 tmux_conf_theme_pane_border_style=thin
 
 # pane borders colours:
-tmux_conf_theme_pane_border='#444444'                   # gray
-tmux_conf_theme_pane_active_border='#00afff'            # light blue
+tmux_conf_theme_pane_border='#3b4261'                   # gutter
+tmux_conf_theme_pane_active_border='#7aa2f7'            # blue
 
 # pane indicator colours
-tmux_conf_theme_pane_indicator='#00afff'                # light blue
-tmux_conf_theme_pane_active_indicator='#00afff'         # light blue
+tmux_conf_theme_pane_indicator='#7aa2f7'                # blue
+tmux_conf_theme_pane_active_indicator='#7aa2f7'         # blue
 
 # status line style
-tmux_conf_theme_message_fg='#000000'                    # black
-tmux_conf_theme_message_bg='#ffff00'                    # yellow
+tmux_conf_theme_message_fg='#1a1b26'                    # bg
+tmux_conf_theme_message_bg='#e0af68'                    # yellow
 tmux_conf_theme_message_attr='bold'
 
 # status line command style (<prefix> : Escape)
-tmux_conf_theme_message_command_fg='#ffff00'            # yellow
-tmux_conf_theme_message_command_bg='#000000'            # black
+tmux_conf_theme_message_command_fg='#e0af68'            # yellow
+tmux_conf_theme_message_command_bg='#1a1b26'            # bg
 tmux_conf_theme_message_command_attr='bold'
 
 # window modes style
-tmux_conf_theme_mode_fg='#000000'                       # black
-tmux_conf_theme_mode_bg='#ffff00'                       # yellow
+tmux_conf_theme_mode_fg='#1a1b26'                       # bg
+tmux_conf_theme_mode_bg='#e0af68'                       # yellow
 tmux_conf_theme_mode_attr='bold'
 
 # status line style
-tmux_conf_theme_status_fg='#8a8a8a'                     # light gray
-tmux_conf_theme_status_bg='#080808'                     # dark gray
+tmux_conf_theme_status_fg='#a9b1d6'                     # fg_dark
+tmux_conf_theme_status_bg='#16161e'                     # bg_dark
 tmux_conf_theme_status_attr='none'
 
 # terminal title
@@ -125,8 +150,8 @@ tmux_conf_theme_terminal_title='#h ❐ #S ● #I #W'
 #     - #{hostname_ssh}
 #     - #{username}
 #     - #{username_ssh}
-tmux_conf_theme_window_status_fg='#8a8a8a'              # light gray
-tmux_conf_theme_window_status_bg='#080808'              # dark gray
+tmux_conf_theme_window_status_fg='#a9b1d6'              # fg_dark
+tmux_conf_theme_window_status_bg='#16161e'              # bg_dark
 tmux_conf_theme_window_status_attr='none'
 tmux_conf_theme_window_status_format='#I #W'
 #tmux_conf_theme_window_status_format='#{circled_window_index} #W'
@@ -140,8 +165,8 @@ tmux_conf_theme_window_status_format='#I #W'
 #     - #{hostname_ssh}
 #     - #{username}
 #     - #{username_ssh}
-tmux_conf_theme_window_status_current_fg='#000000'      # black
-tmux_conf_theme_window_status_current_bg='#00afff'      # light blue
+tmux_conf_theme_window_status_current_fg='#1a1b26'      # bg
+tmux_conf_theme_window_status_current_bg='#7aa2f7'      # blue
 tmux_conf_theme_window_status_current_attr='bold'
 tmux_conf_theme_window_status_current_format='#I #W'
 #tmux_conf_theme_window_status_current_format='#{circled_window_index} #W'
@@ -153,12 +178,12 @@ tmux_conf_theme_window_status_activity_bg='default'
 tmux_conf_theme_window_status_activity_attr='underscore'
 
 # window bell status style
-tmux_conf_theme_window_status_bell_fg='#ffff00'         # yellow
+tmux_conf_theme_window_status_bell_fg='#e0af68'         # yellow
 tmux_conf_theme_window_status_bell_bg='default'
 tmux_conf_theme_window_status_bell_attr='blink,bold'
 
 # window last status style
-tmux_conf_theme_window_status_last_fg='#00afff'         # light blue
+tmux_conf_theme_window_status_last_fg='#7aa2f7'         # blue
 tmux_conf_theme_window_status_last_bg='default'
 tmux_conf_theme_window_status_last_attr='none'
 
@@ -219,13 +244,13 @@ tmux_conf_theme_status_left=' ❐ #S '
 tmux_conf_theme_status_right='#{prefix}#{pairing}#{synchronized} , %R , #{username}#{root} '
 
 # status left style
-tmux_conf_theme_status_left_fg='#000000'                  # black
-tmux_conf_theme_status_left_bg='#ffff00'                  # yellow
+tmux_conf_theme_status_left_fg='#1a1b26'                # bg
+tmux_conf_theme_status_left_bg='#e0af68'                # yellow
 tmux_conf_theme_status_left_attr='bold'
 
 # status right style
-tmux_conf_theme_status_right_fg='#8a8a8a,#e4e4e4,#000000' # light gray, white, black
-tmux_conf_theme_status_right_bg='#080808,#d70000,#e4e4e4' # dark gray, red, white
+tmux_conf_theme_status_right_fg='#a9b1d6,#c0caf5,#1a1b26' # fg_dark, fg, bg
+tmux_conf_theme_status_right_bg='#16161e,#f7768e,#c0caf5' # bg_dark, red, fg
 tmux_conf_theme_status_right_attr='none,none,bold'
 
 # pairing indicator
@@ -356,3 +381,33 @@ set -ag terminal-overrides ",*:smBP=\\E[?2004h,*:rmBP=\\E[?2004l"
 #   prefix + Ctrl-r   restore
 if '[ -f ~/.tmux/plugins/tmux-resurrect/resurrect.tmux ]' \
    'run-shell ~/.tmux/plugins/tmux-resurrect/resurrect.tmux'
+
+# -- machine-local overrides ---------------------------------------------------
+
+# ~/.tmux.conf.user: absent by default, never committed, lives in $HOME rather
+# than in the repo (this file is a symlink, so anything written beside it would
+# land in version control). Same arrangement as ~/.zshrc.local, Ghostty's
+# ghostty-local.conf and nvim's lua/config/local.lua.
+#
+# It holds tmux commands, not oh-my-tmux's tmux_conf_* variables: those are read
+# by _apply_configuration() out of *this* file specifically, so a variable set
+# anywhere else is simply not seen. To recolour a segment, set the option
+# directly - `set -g status-style "fg=...,bg=..."`,
+# `set -g window-status-current-style ...`.
+#
+# Loaded from a hook rather than sourced here, because sourcing here does not
+# work. oh-my-tmux's .tmux.conf sources this file (its line 160) and only then
+# runs _apply_configuration (line 161), which writes status-style,
+# window-status-current-style and the rest from the tmux_conf_theme_* variables
+# above. Anything this file sets directly is therefore overwritten a moment
+# later. Measured, not reasoned about: with `source-file ~/.tmux.conf.user`
+# at this point, a user file setting bg=#040506 lost to the theme's bg=#16161e
+# on a fresh session in the test container.
+#
+# session-created and client-attached both fire after the config queue has
+# drained, so the override lands last and wins - verified the same way. Both
+# hooks, because a detached `new-session -d` never attaches a client and an
+# `attach` to an existing server never creates a session. Re-sourcing on every
+# attach is harmless; these are idempotent `set` commands.
+set-hook -g session-created 'source-file -q ~/.tmux.conf.user'
+set-hook -g client-attached 'source-file -q ~/.tmux.conf.user'

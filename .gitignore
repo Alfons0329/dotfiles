@@ -10,6 +10,12 @@ home/.zshrc.local
 # reject as unknown keys.
 home/.config/ghostty/ghostty-local.conf
 
+# Machine-local Neovim overrides, loaded by init.lua. ~/.config/nvim is a single
+# symlink to home/.config/nvim, so unlike ~/.zshrc.local and ~/.tmux.conf.user -
+# which sit in $HOME and never touch the repo - a local.lua written through that
+# symlink lands here.
+home/.config/nvim/lua/config/local.lua
+
 # Working notes and screenshots. The screenshots carry hostnames and container
 # IDs, so they stay out of a public repo.
 issue/
