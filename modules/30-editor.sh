@@ -39,10 +39,17 @@ nvim_asset_arch() {
     esac
 }
 
-install_neovim_linux() {
-    local arch tarball url tmp extracted target
+# Both platforms install the same pinned release tarball, not a package
+# manager. On macOS this used to be `brew install neovim` (still listed in
+# packages/brew.txt until the fix that added this comment), which pulls
+# whatever Homebrew currently calls stable - that floated onto 0.12.4 and hit
+# the exact query-predicate crash the NVIM_VERSION pin above exists to avoid.
+# A version pin that only one platform honours is not a pin.
+install_neovim() {
+    local os_prefix arch tarball url tmp extracted target
+    os_prefix="macos"; is_macos || os_prefix="linux"
     arch="$(nvim_asset_arch)"
-    tarball="nvim-linux-${arch}.tar.gz"
+    tarball="nvim-${os_prefix}-${arch}.tar.gz"
 
     if [ "$NVIM_VERSION" = "latest" ]; then
         url="https://github.com/neovim/neovim/releases/latest/download/${tarball}"
@@ -60,7 +67,7 @@ install_neovim_linux() {
         fi
     fi
 
-    log "Installing Neovim $NVIM_VERSION ($arch)..."
+    log "Installing Neovim $NVIM_VERSION ($os_prefix/$arch)..."
     tmp="$(mktemp -d)"
     # shellcheck disable=SC2064  # expand $tmp now, not at trap time
     trap "rm -rf '$tmp'" RETURN
@@ -69,50 +76,41 @@ install_neovim_linux() {
 
     if [ "$DRY_RUN" = "1" ]; then
         run tar -xzf "$tmp/$tarball" -C "$tmp"
-        run "$SUDO" mv "$tmp/nvim-linux-$arch" /opt/
-        run "$SUDO" ln -sf "/opt/nvim-linux-$arch/bin/nvim" /usr/local/bin/nvim
+        run "$SUDO" mkdir -p /opt
+        run "$SUDO" mv "$tmp/nvim-${os_prefix}-$arch" /opt/
+        run "$SUDO" ln -sf "/opt/nvim-${os_prefix}-$arch/bin/nvim" /usr/local/bin/nvim
         return 0
     fi
 
     tar -xzf "$tmp/$tarball" -C "$tmp"
-    extracted="$tmp/nvim-linux-${arch}"
+    extracted="$tmp/nvim-${os_prefix}-${arch}"
     [ -d "$extracted" ] || die "Unexpected archive layout in $tarball"
 
-    target="/opt/nvim-linux-${arch}"
+    target="/opt/nvim-${os_prefix}-${arch}"
+    as_root mkdir -p /opt
     as_root rm -rf "$target"
     as_root mv "$extracted" /opt/
     as_root ln -sf "$target/bin/nvim" /usr/local/bin/nvim
 
     # A binary that unpacks but won't run is the failure mode this pin exists to
-    # prevent (glibc too old). Fail loudly: silently falling back to the distro
-    # package would install a Neovim too old to load this config at all, and the
-    # user would discover that as a wall of Lua errors instead of one message.
+    # prevent (glibc too old on Linux). Fail loudly: silently falling back to a
+    # package manager's version would install a Neovim this config was not
+    # tested against, and the user would discover that as a wall of Lua errors
+    # instead of one message.
     if ! /usr/local/bin/nvim --version >/dev/null 2>&1; then
         local err
         err="$(/usr/local/bin/nvim --version 2>&1 | head -3 || true)"
         die "Neovim $NVIM_VERSION does not run on this system:
     $err
-
+$(is_macos || echo "
   This is almost always a glibc mismatch. Your glibc:
-    $(ldd --version 2>/dev/null | head -1)
-  Pick an older release and retry, e.g.:
+    $(ldd --version 2>/dev/null | head -1)")
+  Pick a different release and retry, e.g.:
     NVIM_VERSION=v0.11.0 ./install.sh --only editor
   (v0.11.0 is the floor: blink.cmp requires Neovim >= 0.11.)"
     fi
 
     log "Installed $(nvim --version | head -1)"
-}
-
-install_neovim() {
-    if is_macos; then
-        # Handled by packages/brew.txt; just confirm it landed.
-        have nvim && { skip "Neovim installed via Homebrew"; return 0; }
-        [ "$DRY_RUN" = "1" ] && return 0
-        warn "Neovim not found after the packages module; trying brew directly."
-        run brew install neovim
-        return 0
-    fi
-    install_neovim_linux
 }
 
 check_neovim_version() {
