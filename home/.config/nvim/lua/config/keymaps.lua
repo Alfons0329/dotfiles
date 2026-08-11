@@ -31,10 +31,30 @@ map("v", ">", ">gv")
 map("n", "<leader>w", "<cmd>write<CR>", { desc = "Write buffer" })
 map("n", "<leader>q", "<cmd>quit<CR>", { desc = "Quit window" })
 
+-- Splits. VSCode's "drag the file to the right" has no drag in a terminal, so
+-- the workflow is: split first, then open or move the file into it. These only
+-- *create* the split - moving between them is the <C-hjkl> block above, and
+-- splitright/splitbelow (options.lua) make them open where you expect.
+map("n", "<leader>sv", "<cmd>vsplit<CR>", { desc = "Split window right" })
+map("n", "<leader>sh", "<cmd>split<CR>",  { desc = "Split window below" })
+
 -- Buffer cycling, the vim-native equivalent of the editor-tab keys in
 -- lua/plugins/ui.lua.
 map("n", "<S-l>", "<cmd>bnext<CR>", { desc = "Next buffer" })
 map("n", "<S-h>", "<cmd>bprevious<CR>", { desc = "Previous buffer" })
+
+-- Leader aliases for tab cycling, the "tab next/prev" mnemonic. Buffers are
+-- what bufferline renders as editor tabs, so these are the same action as
+-- <S-l>/<S-h> and the <C-PageDown> pair - kept as the discoverable <leader>t
+-- form for anyone reaching for it.
+map("n", "<leader>tn", "<cmd>bnext<CR>",     { desc = "Next editor tab" })
+map("n", "<leader>tp", "<cmd>bprevious<CR>", { desc = "Previous editor tab" })
+
+-- Search-and-replace. <leader>fr is taken (recent files), so replace lives
+-- under <leader>sr. This prefills the per-buffer substitute command with the
+-- confirm flag; the project-wide flow is <leader>fg to grep, <C-q> to send the
+-- hits to the quickfix list, then :cdo s/old/new/gc | update.
+map("n", "<leader>sr", ":%s///gc<Left><Left><Left><Left>", { desc = "Find and replace in buffer" })
 
 -- -------------------------------------------------------------------
 -- VSCode-shaped bindings
