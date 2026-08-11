@@ -7,24 +7,37 @@
 #   ./test/docker-test.sh              build, then report
 #   ./test/docker-test.sh --shell      build, then drop into the container
 #   ./test/docker-test.sh --with-lsp   also install language servers
+#   ./test/docker-test.sh --powerline  install bullet-train instead of starship
 #
 # --with-lsp matters because install.sh now installs language servers by
 # default; the routine build turns them off to stay quick, so without this flag
 # nothing exercises the path a real machine actually takes.
+#
+# --powerline matters for the same reason: the default build never passes it,
+# so without this flag the bullet-train branch in verify.sh's zsh checks would
+# never run on any platform this test suite actually covers.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IMAGE="${IMAGE:-dotfiles-test}"
-INSTALL_FLAGS="--yes --minimal --no-lsp-servers"
 SHELL_AFTER=0
+WITH_LSP=0
+POWERLINE=0
 
 for arg in "$@"; do
     case "$arg" in
-        --shell)    SHELL_AFTER=1 ;;
-        --with-lsp) INSTALL_FLAGS="--yes --minimal" ;;
-        *) echo "Unknown option: $arg  (--shell, --with-lsp)" >&2; exit 1 ;;
+        --shell)     SHELL_AFTER=1 ;;
+        --with-lsp)  WITH_LSP=1 ;;
+        --powerline) POWERLINE=1 ;;
+        *) echo "Unknown option: $arg  (--shell, --with-lsp, --powerline)" >&2; exit 1 ;;
     esac
 done
+
+# Composed from booleans, not overwritten in place, so any combination of
+# flags (e.g. --with-lsp --powerline together) survives regardless of order.
+INSTALL_FLAGS="--yes --minimal"
+[ "$WITH_LSP" = "1" ] || INSTALL_FLAGS="$INSTALL_FLAGS --no-lsp-servers"
+[ "$POWERLINE" = "1" ] && INSTALL_FLAGS="$INSTALL_FLAGS --powerline"
 
 cd "$ROOT"
 
@@ -38,7 +51,11 @@ echo
 echo "==> Build succeeded: install.sh and verify.sh both passed."
 
 if [ "$SHELL_AFTER" = "1" ]; then
-    echo "==> Starting an interactive shell (expect a bullet-train zsh prompt)."
+    if [ "$POWERLINE" = "1" ]; then
+        echo "==> Starting an interactive shell (expect a bullet-train zsh prompt)."
+    else
+        echo "==> Starting an interactive shell (expect a starship zsh prompt)."
+    fi
     # -e TERM because `docker run -t` otherwise hardcodes TERM=xterm inside the
     # container - not the host's TERM, and not overridable from the outside
     # environment - and xterm's terminfo declares colors#8. tmux then flattens

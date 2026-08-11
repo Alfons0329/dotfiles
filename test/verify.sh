@@ -74,14 +74,24 @@ section "zsh"
 # ------------------------------------------------------------------
 ZSH_CUSTOM="$HOME/.oh-my-zsh/custom"
 check "oh-my-zsh installed"        "[ -d $HOME/.oh-my-zsh ]"
-check "bullet-train theme"         "[ -f $ZSH_CUSTOM/themes/bullet-train.zsh-theme ]"
 check "zsh-autosuggestions"        "[ -d $ZSH_CUSTOM/plugins/zsh-autosuggestions ]"
 check "zsh-syntax-highlighting"    "[ -d $ZSH_CUSTOM/plugins/zsh-syntax-highlighting ]"
 check ".zshrc is a symlink"        "[ -L $HOME/.zshrc ]"
 check ".zshrc.local seeded"        "[ -f $HOME/.zshrc.local ]"
 check "interactive zsh starts cleanly" "zsh -ic exit"
-check "theme is bullet-train"      "zsh -ic 'echo \$ZSH_THEME' 2>/dev/null | grep -q bullet-train"
-check "prompt renders (bullet-train loaded)" \
+
+# Which prompt is expected depends on --powerline, recorded by
+# modules/10-shell.sh in ~/.zsh_theme_mode - branch on that rather than
+# hardcoding one theme, so this check is honest about whichever install.sh was
+# actually run.
+if [ -f "$HOME/.zsh_theme_mode" ] && grep -q 'DOTFILES_PROMPT="bullet-train"' "$HOME/.zsh_theme_mode"; then
+    check "bullet-train theme"    "[ -f $ZSH_CUSTOM/themes/bullet-train.zsh-theme ]"
+    check "theme is bullet-train" "zsh -ic 'echo \$ZSH_THEME' 2>/dev/null | grep -q bullet-train"
+else
+    check "starship installed"       "command -v starship || [ -x $HOME/.local/bin/starship ]"
+    check "starship owns the prompt" "zsh -ic 'type starship' 2>/dev/null | grep -q starship"
+fi
+check "prompt renders" \
       "zsh -ic 'echo \$PROMPT' 2>/dev/null | grep -q ."
 
 # tmux replaces every multibyte character with '_' when the client locale is not

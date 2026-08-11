@@ -30,6 +30,7 @@ and the GUI modules are skipped.
 --no-lsp-servers     Skip language servers (they install by default).
 --ghostty-build      macOS: build the patched Ghostty without being asked.
 --insecure, -k       Disable TLS verification, for TLS-inspecting proxies.
+--powerline          Use the bullet-train zsh theme instead of starship.
 --yes, -y            Never prompt.
 --help, -h
 ```
@@ -44,7 +45,7 @@ Modules run in this order, and each is also a standalone script:
 | Module | What it does |
 | --- | --- |
 | `packages` | System packages from `packages/*.txt`, locale |
-| `shell` | zsh, oh-my-zsh, bullet-train theme, plugins, login shell |
+| `shell` | zsh, oh-my-zsh, starship prompt (or bullet-train with `--powerline`), plugins, login shell |
 | `tmux` | oh-my-tmux + tmux-resurrect |
 | `editor` | Neovim + its Lua config; a separate `.vimrc` for plain vim |
 | `tools` | fzf with key bindings, Node.js |
@@ -55,8 +56,9 @@ Modules run in this order, and each is also a standalone script:
 ## What gets installed
 
 **Shell** — [zsh](https://www.zsh.org/) with
-[oh-my-zsh](https://github.com/ohmyzsh/ohmyzsh), the
-[bullet-train](https://github.com/caiogondim/bullet-train.zsh) theme,
+[oh-my-zsh](https://github.com/ohmyzsh/ohmyzsh),
+[starship](https://starship.rs) as the prompt (`--powerline` swaps in the
+[bullet-train](https://github.com/caiogondim/bullet-train.zsh) theme instead),
 [zsh-autosuggestions](https://github.com/zsh-users/zsh-autosuggestions) and
 [zsh-syntax-highlighting](https://github.com/zsh-users/zsh-syntax-highlighting).
 
@@ -272,8 +274,11 @@ belong in a script whose promise is that you run it once.
 
 ## Terminals
 
-The powerline glyphs in the tmux status bar and the zsh prompt need **two**
-things, and both failure modes look identical — a row of boxes or underscores:
+The powerline glyphs in the tmux status bar (and, with `--powerline`, the
+bullet-train zsh prompt) need **two** things, and both failure modes look
+identical — a row of boxes or underscores. starship, the default prompt, uses
+the same Nerd Font glyph set as the tmux/lualine icons below, so it needs no
+separate font and no `--powerline`-only cask:
 
 1. **A patched font in the terminal emulator** — the machine you sit at, not the
    box you SSH into. `font-roboto-mono-nerd-font` is installed on macOS and set
@@ -402,6 +407,7 @@ and the Ghostty build — is covered by `--dry-run` and `shellcheck` only.
 ## Credits
 
 Built on the work of [oh-my-zsh](https://github.com/ohmyzsh/ohmyzsh),
+[starship](https://starship.rs),
 [bullet-train.zsh](https://github.com/caiogondim/bullet-train.zsh),
 [oh-my-tmux](https://github.com/gpakosz/.tmux),
 [tmux-resurrect](https://github.com/tmux-plugins/tmux-resurrect),

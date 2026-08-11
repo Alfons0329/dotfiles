@@ -57,6 +57,7 @@ confirm() {
 : "${LSP_SERVERS:=1}"    # 1 = install language servers via mason (--no-lsp-servers)
 : "${GHOSTTY_BUILD:=0}"  # 1 = build the patched Ghostty from source (macOS only)
 : "${INSECURE:=0}"       # 1 = disable TLS verification (corporate MITM proxy)
+: "${POWERLINE:=0}"      # 1 = use the bullet-train zsh theme instead of starship
 : "${FORCE_PKG_MGR:=}"   # override OS detection, for dry-run inspection
 
 CURL_OPTS="-fsSL"

@@ -60,17 +60,37 @@ export COLORTERM
 
 export ZSH="$HOME/.oh-my-zsh"
 
-# bullet-train lives in $ZSH_CUSTOM/themes and needs a powerline-patched font
-# (Roboto Mono for Powerline is installed by the desktop module on macOS).
-ZSH_THEME="bullet-train"
+# Which prompt this machine uses is an install-time choice (--powerline),
+# written by modules/10-shell.sh to ~/.zsh_theme_mode since this file itself is
+# one symlink shared by every machine. Default to starship if that marker is
+# missing, e.g. this file sourced before install.sh has ever run.
+DOTFILES_PROMPT="starship"
+[ -f "$HOME/.zsh_theme_mode" ] && source "$HOME/.zsh_theme_mode"
+
+if [ "$DOTFILES_PROMPT" = "bullet-train" ]; then
+    # bullet-train lives in $ZSH_CUSTOM/themes and needs a powerline-patched
+    # font (Roboto Mono for Powerline is installed by the desktop module on
+    # macOS).
+    ZSH_THEME="bullet-train"
+    # Compute the git prompt off the main thread; without this, prompt redraw
+    # in a large repo blocks every keystroke.
+    zstyle ':omz:alpha:lib:git' async-prompt yes
+else
+    # Empty tells oh-my-zsh not to source a theme file; starship (initialized
+    # below, after oh-my-zsh finishes) owns the prompt instead.
+    ZSH_THEME=""
+fi
 
 plugins=(git zsh-autosuggestions zsh-syntax-highlighting)
 
-# Compute the git prompt off the main thread; without this, prompt redraw in a
-# large repo blocks every keystroke.
-zstyle ':omz:alpha:lib:git' async-prompt yes
-
 source "$ZSH/oh-my-zsh.sh"
+
+# starship (https://starship.rs) - the default prompt. Its init has to run
+# after oh-my-zsh.sh finishes sourcing, since a theme (if one loaded) would
+# otherwise overwrite $PROMPT after starship sets it.
+if [ "$DOTFILES_PROMPT" != "bullet-train" ] && (( $+commands[starship] )); then
+    eval "$(starship init zsh)"
+fi
 
 # -------------------------------------------------------------------
 # PATH
