@@ -13,6 +13,7 @@
 #   ./install.sh --no-lsp-servers      # skip language servers (large download)
 #   ./install.sh --ghostty-build       # macOS: build the patched Ghostty
 #   ./install.sh --insecure            # behind a TLS-inspecting corporate proxy
+#   ./install.sh --powerline           # use the bullet-train zsh theme instead of starship
 #
 set -euo pipefail
 
@@ -54,6 +55,7 @@ while [ $# -gt 0 ]; do
         --no-lsp-servers) LSP_SERVERS=0 ;;
         --ghostty-build)  GHOSTTY_BUILD=1 ;;
         --insecure|-k)  INSECURE=1 ;;
+        --powerline)    POWERLINE=1 ;;
         --only)         shift; ONLY="${1:-}" ;;
         --only=*)       ONLY="${1#*=}" ;;
         --skip)         shift; SKIP="${1:-}" ;;
@@ -64,7 +66,7 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-export DRY_RUN MINIMAL ASSUME_YES LSP_SERVERS GHOSTTY_BUILD INSECURE
+export DRY_RUN MINIMAL ASSUME_YES LSP_SERVERS GHOSTTY_BUILD INSECURE POWERLINE
 
 # ------------------------------------------------------------------
 # Preflight

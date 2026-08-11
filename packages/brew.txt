@@ -4,6 +4,10 @@
 zsh
 tmux
 
+# prompt (default; bullet-train is the opt-in --powerline alternative, fetched
+# by modules/10-shell.sh rather than listed here)
+starship
+
 # editors
 # neovim is NOT here on purpose - Homebrew's version floats onto whatever is
 # currently stable, which has already shipped a Neovim 0.12.x that crashes on
