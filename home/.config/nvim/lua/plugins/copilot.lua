@@ -32,6 +32,10 @@ return {
                 -- Don't send commit messages or secrets-adjacent buffers.
                 gitcommit = false,
                 gitrebase = false,
+                -- copilot.lua disables markdown by default (internal_filetypes
+                -- in copilot/client/filetypes.lua); the merge keeps whatever is
+                -- set here, so it has to be re-enabled explicitly.
+                markdown = true,
                 ["."] = false,
             },
         },
