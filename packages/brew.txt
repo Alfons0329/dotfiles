@@ -24,6 +24,7 @@ wget
 fzf
 the_silver_searcher
 ripgrep
+fd
 
 # viewing / formatting
 jq

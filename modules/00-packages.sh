@@ -106,6 +106,20 @@ setup_bat_shim() {
     run ln -sf "$(command -v batcat)" "$HOME/.local/bin/bat"
 }
 
+# ------------------------------------------------------------------
+# fd: Debian ships the binary as `fdfind`, same name clash as bat. snacks.nvim
+# already checks both names itself, but other tools only ever look for `fd`.
+# ------------------------------------------------------------------
+setup_fd_shim() {
+    is_linux || return 0
+    have fdfind || return 0
+    have fd && return 0
+
+    log "Linking fdfind -> fd in ~/.local/bin"
+    run mkdir -p "$HOME/.local/bin"
+    run ln -sf "$(command -v fdfind)" "$HOME/.local/bin/fd"
+}
+
 main() {
     if is_macos; then
         install_homebrew
@@ -116,6 +130,7 @@ main() {
         install_apt_packages
         setup_locale
         setup_bat_shim
+        setup_fd_shim
     fi
 }
 

@@ -52,6 +52,7 @@ section "Search tools"
 # ------------------------------------------------------------------
 check "ag (the_silver_searcher)" "command -v ag && ag --version"
 check "rg (ripgrep)"             "command -v rg && rg --version"
+check "fd (or fdfind shim)"      "command -v fd || command -v fdfind"
 check "fzf on PATH"              "command -v fzf || [ -x $HOME/.fzf/bin/fzf ]"
 
 # apt's fzf is 0.29 and lacks features the config relies on. Assert we got a

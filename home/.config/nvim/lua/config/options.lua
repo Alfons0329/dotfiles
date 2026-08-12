@@ -12,7 +12,7 @@ opt.smartindent = true
 opt.number = true
 opt.relativenumber = false
 opt.cursorline = true
-opt.wrap = false
+opt.wrap = true
 opt.scrolloff = 4
 opt.signcolumn = "yes" -- always reserve the gutter so text doesn't jump when
                        -- diagnostics or git signs appear
