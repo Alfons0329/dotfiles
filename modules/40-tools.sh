@@ -54,6 +54,35 @@ install_fzf() {
 }
 
 # ------------------------------------------------------------------
+# fd
+#
+# Listed in the package manifests (brew.txt / apt.txt), so the package
+# install puts the binary on PATH. The only extra step is on Debian/Ubuntu,
+# where the `fd-find` package ships the binary as `fdfind` (Debian's collision
+# avoidance with fdclone). snacks.picker's explorer search calls `fd`, so
+# symlink the renamed binary into ~/.local/bin - the same user-local dir the
+# starship installer uses, which is already on PATH.
+# ------------------------------------------------------------------
+install_fd() {
+    is_macos && return 0  # brew's `fd` formula installs the `fd` binary directly
+
+    if have fd; then
+        skip "fd already on PATH"
+        return 0
+    fi
+
+    if ! have fdfind; then
+        warn "fdfind not found (apt fd-find not installed?); skipping fd symlink."
+        return 0
+    fi
+
+    mkdir -p "$HOME/.local/bin"
+    run ln -sf "$(command -v fdfind)" "$HOME/.local/bin/fd"
+    log "Symlinked fdfind -> ~/.local/bin/fd for snacks.picker."
+    return 0
+}
+
+# ------------------------------------------------------------------
 # Node.js
 #
 # Needed by ccstatusline, the Claude Code npm fallback, and several language
@@ -94,6 +123,7 @@ install_nodejs() {
 
 main() {
     install_fzf
+    install_fd
     install_nodejs
 }
 

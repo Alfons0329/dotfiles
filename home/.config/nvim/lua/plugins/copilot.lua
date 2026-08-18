@@ -37,6 +37,11 @@ return {
                 -- set here, so it has to be re-enabled explicitly.
                 markdown = true,
                 ["."] = false,
+                -- copilot.lua disables markdown in its internal_filetypes
+                -- defaults (lua/copilot/client/filetypes.lua:4). Your config
+                -- is checked first (is_ft_disabled), so this flips it back on
+                -- for docs and prose.
+                markdown = true,
             },
         },
     },

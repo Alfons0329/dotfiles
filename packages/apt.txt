@@ -27,6 +27,9 @@ net-tools
 # search
 silversearcher-ag
 ripgrep
+# fd-find ships the binary as `fdfind` (Debian renames it to avoid clashing
+# with fdclone); modules/40-tools.sh symlinks it to `fd` so snacks.picker's
+# explorer search, which calls `fd`, finds it.
 fd-find
 
 # viewing / formatting

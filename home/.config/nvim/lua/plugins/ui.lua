@@ -7,9 +7,28 @@
 -- &statusline from their own autocmds, so whichever fired last won and the
 -- statusline visibly changed style after every :w. Keeping one owner per
 -- concern is the entire fix.
+--
+-- The colorscheme is chosen by ~/.dotfiles_theme (written by install.sh
+-- --theme), so nvim and Ghostty ship the same palette on a given machine.
+-- Exactly one colorscheme plugin is returned below, so only one loads and
+-- calls :colorscheme at startup - switching themes swaps the plugin spec, and
+-- lazy.nvim installs the new one on the next launch.
 
-return {
-    {
+local active_theme = function()
+    local path = vim.fn.expand("~/.dotfiles_theme")
+    local ok, lines = pcall(vim.fn.readfile, path)
+    if not ok then return "tokyonight" end
+    for _, line in ipairs(lines) do
+        local name = line:match('^DOTFILES_THEME="(.+)"$')
+        if name then return name end
+    end
+    return "tokyonight"
+end
+
+local theme = active_theme()
+
+local colorscheme_plugins = {
+    tokyonight = {
         "folke/tokyonight.nvim",
         lazy = false,
         priority = 1000, -- must load before anything that reads highlight groups
@@ -31,22 +50,50 @@ return {
             vim.cmd.colorscheme("tokyonight")
         end,
     },
+    kanagawa = {
+        "rebelot/kanagawa.nvim",
+        lazy = false,
+        priority = 1000,
+        config = function()
+            vim.cmd.colorscheme("kanagawa")
+        end,
+    },
+    ["ayu-dark"] = {
+        "Shatur/neovim-ayu",
+        lazy = false,
+        priority = 1000,
+        opts = { mirage = false, terminal = true },
+        config = function(_, opts)
+            require("ayu").setup(opts)
+            vim.cmd.colorscheme("ayu-dark")
+        end,
+    },
+}
+
+-- Map each editor theme to the lualine theme name, or "auto" when lualine has
+-- none built in (kanagawa). "auto" derives the statusline colours from the
+-- active highlight groups, so a missing theme module degrades the colours
+-- instead of breaking the statusline outright.
+local lualine_theme_name = {
+    tokyonight = "tokyonight",
+    kanagawa = "auto",
+    ["ayu-dark"] = "ayu_dark",
+}
+local lualine_theme =
+    pcall(require, "lualine.themes." .. lualine_theme_name[theme]) and lualine_theme_name[theme]
+    or "auto"
+
+return {
+    colorscheme_plugins[theme] or colorscheme_plugins.tokyonight,
 
     {
         "nvim-lualine/lualine.nvim",
         dependencies = { "nvim-tree/nvim-web-devicons" },
         event = "VeryLazy",
         opts = function()
-            -- lualine ships no tokyonight theme of its own; the file comes from
-            -- the tokyonight plugin's own lua/lualine/themes/ directory. Fall
-            -- back to "auto" (derived from the active highlight groups) so a
-            -- load-order change degrades the colours instead of breaking the
-            -- statusline outright.
-            local theme = pcall(require, "lualine.themes.tokyonight") and "tokyonight" or "auto"
-
             return {
                 options = {
-                    theme = theme,
+                    theme = lualine_theme,
                     globalstatus = true, -- pairs with laststatus=3
                     -- Powerline separators, matching the tmux status bar, which
                     -- names the same four codepoints at .tmux.conf.local's

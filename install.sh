@@ -14,6 +14,7 @@
 #   ./install.sh --ghostty-build       # macOS: build the patched Ghostty
 #   ./install.sh --insecure            # behind a TLS-inspecting corporate proxy
 #   ./install.sh --powerline           # use the bullet-train zsh theme instead of starship
+#   ./install.sh --theme kanagawa      # tokyonight (default) | kanagawa | ayu-dark, for nvim + Ghostty
 #
 set -euo pipefail
 
@@ -23,6 +24,7 @@ source "$SCRIPT_DIR/lib/core.sh"
 
 ONLY=""
 SKIP=""
+THEME="tokyonight"
 
 usage() {
     # Print the header comment block, stopping at the first line of code, so
@@ -42,6 +44,7 @@ Modules (in run order):
 
 Environment:
   NVIM_VERSION   Neovim release tag to install (default: pinned known-good)
+  DOTFILES_THEME tokyonight (default) | kanagawa | ayu-dark, for nvim + Ghostty
   DRY_RUN=1      same as --dry-run
 EOF
 }
@@ -56,6 +59,8 @@ while [ $# -gt 0 ]; do
         --ghostty-build)  GHOSTTY_BUILD=1 ;;
         --insecure|-k)  INSECURE=1 ;;
         --powerline)    POWERLINE=1 ;;
+        --theme)        shift; THEME="${1:-}" ;;
+        --theme=*)      THEME="${1#*=}" ;;
         --only)         shift; ONLY="${1:-}" ;;
         --only=*)       ONLY="${1#*=}" ;;
         --skip)         shift; SKIP="${1:-}" ;;
@@ -66,7 +71,15 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-export DRY_RUN MINIMAL ASSUME_YES LSP_SERVERS GHOSTTY_BUILD INSECURE POWERLINE
+export DRY_RUN MINIMAL ASSUME_YES LSP_SERVERS GHOSTTY_BUILD INSECURE POWERLINE THEME
+
+# Validate the theme name up front - a typo should fail loudly, not silently
+# leave a machine on the default while the user thinks they switched.
+case "$THEME" in
+    tokyonight|kanagawa|ayu-dark) ;;
+    *) die "Unknown theme '$THEME'. Available: tokyonight, kanagawa, ayu-dark" ;;
+esac
+export DOTFILES_THEME="$THEME"
 
 # ------------------------------------------------------------------
 # Preflight
