@@ -332,6 +332,8 @@ check "notifier script"         "[ -x $HOME/.local/bin/claude-notify.sh ]"
 check "settings.json is valid"  "python3 -c 'import json;json.load(open(\"$HOME/.claude/settings.json\"))'"
 check "statusLine configured"   "grep -q ccstatusline $HOME/.claude/settings.json"
 check "Stop hook wired"         "grep -q claude-notify $HOME/.claude/settings.json"
+check "eli5 output style linked"      "[ -L $HOME/.claude/output-styles/eli5.md ]"
+check "eli5 output style frontmatter" "head -5 $HOME/.claude/output-styles/eli5.md | grep -qx 'name: ELI5'"
 
 # ------------------------------------------------------------------
 if $IS_MACOS; then
