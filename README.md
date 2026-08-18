@@ -52,6 +52,7 @@ Modules run in this order, and each is also a standalone script:
 | `editor` | Neovim + its Lua config; a separate `.vimrc` for plain vim |
 | `tools` | fzf with key bindings, Node.js |
 | `claude` | Claude Code, ccstatusline, completion notifications |
+| `claude-output-styles` | Claude Code output styles (`~/.claude/output-styles`) |
 | `desktop` | macOS only: terminal, fonts, system monitor, iTerm2 profile |
 | `ghostty` | macOS only: opt-in patched Ghostty build — [asks first](#patched-ghostty-macos) |
 
