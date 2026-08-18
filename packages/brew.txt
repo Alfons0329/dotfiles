@@ -24,6 +24,8 @@ wget
 fzf
 the_silver_searcher
 ripgrep
+# fd is the fast find that snacks.picker's explorer search uses; without it the
+# explorer's search box errors with "no search file 'fd'".
 fd
 
 # viewing / formatting

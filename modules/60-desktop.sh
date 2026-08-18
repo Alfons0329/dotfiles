@@ -35,6 +35,58 @@ deploy_ghostty_config() {
     link "$HOME_SRC/.config/ghostty/config" "$HOME/.config/ghostty/config"
 }
 
+# Write the resolved theme to the machine-local ghostty-local.conf override.
+# The theme gets its default from the tracked config, so for tokyonight
+# (the default), we write nothing - the tracked `theme = TokyoNight Night` is used.
+# For kanagawa or ayu-dark, we append the resolved `theme =` line to the local
+# override file, which loads last and wins.
+deploy_ghostty_theme() {
+    is_macos || return 0
+    [ -n "${DOTFILES_THEME:-}" ] || return 0
+
+    local theme_name
+    case "$DOTFILES_THEME" in
+        tokyonight) theme_name="TokyoNight Night" ;;
+        kanagawa)   theme_name="Kanagawa Wave" ;;
+        ayu-dark)   theme_name="Ayu" ;;
+        *)          return 0 ;;  # should not reach here (validated in install.sh)
+    esac
+
+    local local_conf="$HOME/.config/ghostty/ghostty-local.conf"
+
+    if [ "$DRY_RUN" = "1" ]; then
+        if [ "$DOTFILES_THEME" != "tokyonight" ]; then
+            run_sh "cat >> '$local_conf' <<'EOF' (append theme to local override)"
+        fi
+        return 0
+    fi
+
+    mkdir -p "$(dirname "$local_conf")"
+
+    # Strip any existing managed theme block - both the `theme = ` line and
+    # its `# Theme set by dotfiles` comment - so switching back to the default
+    # removes the override entirely instead of leaving a stale line behind.
+    # Portable: filter to a temp file, then move back. Other lines in
+    # ghostty-local.conf (e.g. the paste-fix written by 70-ghostty.sh) survive.
+    if [ -f "$local_conf" ]; then
+        local tmp
+        tmp="$local_conf.tmp.$$"
+        grep -v -e '^theme = ' -e '^# Theme set by dotfiles' "$local_conf" > "$tmp"
+        run mv "$tmp" "$local_conf"
+    fi
+
+    # For non-default themes, append the theme line so it overrides the tracked default.
+    if [ "$DOTFILES_THEME" != "tokyonight" ]; then
+        step "ghostty theme -> $DOTFILES_THEME"
+        cat >> "$local_conf" <<EOF
+# Theme set by dotfiles/install.sh --theme $DOTFILES_THEME
+theme = $theme_name
+EOF
+    else
+        step "ghostty theme -> tokyonight (tracked default, override removed)"
+    fi
+}
+
 # iTerm2. Configured only when it is already installed - this is a Ghostty-first
 # setup, and a dotfiles run should not drag in a second terminal emulator.
 #
@@ -111,6 +163,7 @@ main() {
 
     install_casks
     deploy_ghostty_config
+    deploy_ghostty_theme
     deploy_iterm_profile
 }
 
