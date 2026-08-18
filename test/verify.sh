@@ -208,11 +208,25 @@ check "config dir symlinked"  "[ -L $HOME/.config/nvim ]"
 check "init.lua present"      "[ -f $HOME/.config/nvim/init.lua ]"
 check "lazy.nvim bootstrapped" "[ -d $HOME/.local/share/nvim/lazy/lazy.nvim ]"
 
-for plugin in snacks.nvim tokyonight.nvim lualine.nvim bufferline.nvim \
+# The colorscheme is chosen by install.sh --theme and recorded in
+# ~/.dotfiles_theme (default tokyonight). Resolve the plugin + colorscheme
+# name this machine expects, so the checks below stay honest for any theme
+# instead of passing for the wrong reason when someone switches.
+DOTFILES_THEME="tokyonight"
+[ -f "$HOME/.dotfiles_theme" ] && source "$HOME/.dotfiles_theme"
+case "$DOTFILES_THEME" in
+    tokyonight) CS_PLUGIN="tokyonight.nvim";   CS_NAME="tokyonight" ;;
+    kanagawa)   CS_PLUGIN="kanagawa.nvim";     CS_NAME="kanagawa"   ;;
+    ayu-dark)   CS_PLUGIN="neovim-ayu";        CS_NAME="ayu"        ;;
+    *)          CS_PLUGIN="tokyonight.nvim";   CS_NAME="tokyonight" ;;
+esac
+
+for plugin in snacks.nvim lualine.nvim bufferline.nvim \
               nvim-autopairs gitsigns.nvim nvim-treesitter nvim-lspconfig \
               blink.cmp mason.nvim copilot.lua; do
     check "plugin: $plugin" "[ -d $HOME/.local/share/nvim/lazy/$plugin ]"
 done
+check "plugin: $CS_PLUGIN (theme)" "[ -d $HOME/.local/share/nvim/lazy/$CS_PLUGIN ]"
 
 # snacks replaced these four. Assert they are gone rather than merely unused, so
 # a stale lazy directory cannot quietly reintroduce a second file tree or a
@@ -264,8 +278,8 @@ check "lualine owns the statusline" \
 # as decimal escapes because bash 3.2 (what macOS ships) has no \u in $'...'.
 check "lualine renders powerline separators" \
       "nvim --headless -c 'edit $HOME/.config/nvim/init.lua' -c 'lua require(\"lazy\").load({plugins={\"lualine.nvim\"}}); local s=vim.api.nvim_eval_statusline(require(\"lualine\").statusline(true),{winid=0}).str; io.write(tostring(s:find(\"\\238\\130\\176\",1,true)~=nil))' -c qa 2>&1 | grep -q true"
-check "colorscheme is tokyonight" \
-      "nvim --headless -c 'lua io.write(vim.g.colors_name or \"\")' -c qa 2>&1 | grep -q tokyonight"
+check "colorscheme is $CS_NAME" \
+      "nvim --headless -c 'lua io.write(vim.g.colors_name or \"\")' -c qa 2>&1 | grep -q '$CS_NAME'"
 # "I cannot see the cursorline" was a real complaint; assert it has a background.
 check "cursorline is visible" \
       "nvim --headless -c 'lua io.write(tostring(vim.api.nvim_get_hl(0,{name=\"CursorLine\"}).bg))' -c qa 2>&1 | grep -qv '^nil$'"

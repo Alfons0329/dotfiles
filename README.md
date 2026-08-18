@@ -31,6 +31,7 @@ and the GUI modules are skipped.
 --ghostty-build      macOS: build the patched Ghostty without being asked.
 --insecure, -k       Disable TLS verification, for TLS-inspecting proxies.
 --powerline          Use the bullet-train zsh theme instead of starship.
+--theme <name>       Editor + terminal colorscheme: tokyonight (default), kanagawa, or ayu-dark. Applies the same name to Neovim and Ghostty.
 --yes, -y            Never prompt.
 --help, -h
 ```
@@ -38,6 +39,7 @@ and the GUI modules are skipped.
 | Env var | Default | Purpose |
 | --- | --- | --- |
 | `NVIM_VERSION` | `v0.12.4` | Neovim release tag, or `latest`. See [Neovim](#neovim). |
+| `DOTFILES_THEME` | `tokyonight` | Colorscheme for Neovim + Ghostty: `tokyonight`, `kanagawa`, or `ayu-dark`. |
 | `DRY_RUN` | `0` | Same as `--dry-run`. |
 
 Modules run in this order, and each is also a standalone script:
@@ -327,11 +329,14 @@ Separately, `.zshrc` exports `COLORTERM=truecolor` unconditionally, because
 `docker exec -it` / `docker run -it` do not forward host environment variables
 the way a real terminal or SSH session does.
 
-Both terminals are themed **tokyonight**, matching Neovim, so `ls`, `git` and
-`grep` output no longer clash with the editor in the same window. Ghostty uses
-its built-in `TokyoNight Night`; the iTerm2 dynamic profile spells the same
-palette out per channel, since iTerm2 has no theme concept. To use something
-else on one machine, see the override files above.
+Both terminals are themed to match Neovim, so `ls`, `git` and `grep` output no
+longer clash with the editor in the same window. The theme is chosen by
+`install.sh --theme tokyonight|kanagawa|ayu-dark` (default `tokyonight`) and
+applies the same name to both editors: Neovim loads the matching colorscheme
+plugin, and Ghostty uses its built-in theme of that name (`TokyoNight Night`,
+`Kanagawa Wave`, or `Ayu`). The iTerm2 dynamic profile still spells the
+tokyonight palette out per channel, since iTerm2 has no theme concept. To use
+something else on one machine, see the override files above.
 
 The tmux status bar reads: session name on the left, the window list in the
 middle, and the clock plus the current user on the right — `#{root}` appends a
