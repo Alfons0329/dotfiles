@@ -213,6 +213,7 @@ check "lazy.nvim bootstrapped" "[ -d $HOME/.local/share/nvim/lazy/lazy.nvim ]"
 # name this machine expects, so the checks below stay honest for any theme
 # instead of passing for the wrong reason when someone switches.
 DOTFILES_THEME="tokyonight"
+# shellcheck source=/dev/null  # the theme marker is a runtime file, absent at lint time
 [ -f "$HOME/.dotfiles_theme" ] && source "$HOME/.dotfiles_theme"
 case "$DOTFILES_THEME" in
     tokyonight) CS_PLUGIN="tokyonight.nvim";   CS_NAME="tokyonight" ;;

@@ -1,0 +1,124 @@
+# What gets installed, and how to verify it
+
+The reference for the installer's moving parts: the modules it runs, the
+package manifests, the version pins, and the test suite that proves it on a
+bare machine. For the one-command quickstart see the [README](../README.md);
+for the keys see [NEOVIM.md](NEOVIM.md) and [TERMINAL.md](TERMINAL.md).
+
+## Modules
+
+`install.sh` discovers `modules/NN-*.sh` in sorted order. Each is also a
+standalone script with its own `main()`.
+
+| Module | What it does |
+| --- | --- |
+| `packages` | System packages from `packages/*.txt`, locale |
+| `shell` | zsh, oh-my-zsh, starship prompt (or bullet-train with `--powerline`), plugins, login shell |
+| `tmux` | oh-my-tmux + tmux-resurrect |
+| `editor` | Neovim + its Lua config; a separate `.vimrc` for plain vim |
+| `tools` | fzf with key bindings, fd, Node.js |
+| `claude` | Claude Code, ccstatusline, completion notifications |
+| `desktop` | macOS only: terminal, fonts, system monitor, iTerm2 profile |
+| `ghostty` | macOS only: opt-in patched Ghostty build — asks first |
+
+Run one module, or skip some:
+
+```sh
+./install.sh --only editor
+./install.sh --skip claude,tmux
+```
+
+## Package manifests
+
+`packages/apt.txt` (Ubuntu/Debian) and `packages/brew.txt` (macOS), one
+package per line, `#` comments. Two naming traps are handled there and in
+`modules/40-tools.sh`:
+
+- **`fd`** — the fast find that snacks.picker's explorer search calls. brew's
+  `fd` formula installs the binary directly; apt's is `fd-find`, which ships
+  the binary as `fdfind` (Debian renamed it to avoid clashing with fdclone),
+  so `install_fd()` symlinks it to `~/.local/bin/fd`. Without it the explorer's
+  search box errors with `no search file 'fd'`.
+- **fzf** — deliberately *not* in `apt.txt`: apt ships 0.29, which predates
+  `fzf --zsh`, so `modules/40-tools.sh` installs it from git instead.
+- **neovim** — deliberately *not* in `apt.txt`: 22.04 ships 0.6.1, far too old
+  for the Lua config, so `modules/30-editor.sh` installs a pinned release.
+
+## Neovim version pin
+
+`NVIM_VERSION` is pinned rather than tracking `latest`, because Neovim's
+release binaries are linked against whatever glibc their CI image happens to
+ship. Probing a real `ubuntu:22.04` container (glibc 2.35) gave:
+
+| Release | On glibc 2.35 |
+| --- | --- |
+| `v0.10.4` | Fails — requires `GLIBC_2.38` |
+| `v0.11.0` … `v0.12.4` | Runs |
+
+So the floor on Ubuntu 22.04 is `v0.11.0`, which is also blink.cmp's minimum.
+The default is `v0.12.4`. If the pinned build will not run, the installer stops
+with the glibc mismatch spelled out rather than falling back to the distro
+package — failing loudly beats a wall of Lua errors.
+
+```sh
+NVIM_VERSION=v0.11.0 ./install.sh --only editor   # older glibc
+NVIM_VERSION=latest  ./install.sh --only editor   # newest, at your own risk
+```
+
+Language servers install by default — without them nothing completes, jumps to
+a definition, or renames a symbol, which is most of the point. They are still
+the largest and most network-dependent step, so a failure only warns rather
+than failing the run:
+
+```sh
+./install.sh --no-lsp-servers   # skip them (~300-600 MB)
+```
+
+`nvim-treesitter` is pinned to its `master` branch. The default branch is now
+`main`, a rewrite that no longer ships the `nvim-treesitter.configs` module
+this config drives — an unpinned clone throws on every file open and leaves you
+with no syntax highlighting at all. `master` also keeps `auto_install`, so a
+language that is not in the list still highlights itself the first time you
+open one.
+
+**Parsers finish installing lazily, and that is deliberate.** `:TSUpdate` runs
+at install time but is asynchronous, so nvim exits with most parsers still
+building; the first time you open, say, a Python file, its parser compiles in
+the background and highlighting appears a moment later. Forcing them all to
+build up front was tried and is much worse — these are multi-megabyte generated
+C files (`typescript`'s `parser.c` is 17.5 MB, `bash`'s is 9.9 MB) and
+compiling the set serially took over 27 minutes with no output. That does not
+belong in a script whose promise is that you run it once.
+
+## Verifying
+
+`test/verify.sh` asserts behaviour rather than presence — it checks that
+`Ctrl+R` is actually bound to `fzf-history-widget`, that lualine really owns
+the statusline, that the shell exports a UTF-8 locale, that treesitter attaches
+a highlighter to a real buffer, and that no old framework has crept back in:
+
+```sh
+./test/verify.sh        # against the current machine
+./test/shellcheck.sh    # lint every script
+./install.sh --dry-run  # print everything that would happen
+```
+
+One check earns its place more than the rest. Every other Neovim assertion runs
+`nvim --headless +qa`, which never reads a buffer — so nothing lazy-loaded on
+`BufReadPre` ever runs, and a config that crashed on every single file open
+once passed the whole suite. There is now a check that opens a real file and
+demands silence.
+
+The Ubuntu path is proven end to end by a Docker build from a bare image. The
+base image gets `sudo` and a normal user account and nothing else — every tool
+and config has to come from `install.sh`, or the build fails:
+
+```sh
+./test/docker-test.sh            # build + verify
+./test/docker-test.sh --with-lsp # same, plus language servers
+./test/docker-test.sh --shell    # then drop into the container
+```
+
+The routine build passes `--no-lsp-servers` to stay quick; `--with-lsp`
+exercises the path a real machine takes. macOS-only work — the iTerm2 profile
+and the Ghostty build — is covered by `--dry-run` and `shellcheck` only.
