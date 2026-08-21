@@ -93,6 +93,14 @@ top of [oh-my-tmux](https://github.com/gpakosz/.tmux).
 | `<prefix> <C-s>` / `<prefix> <C-r>` | tmux-resurrect: save / restore session |
 | `<C-l>` (no prefix) | clear the screen **and** tmux's scrollback history |
 
+tmux's own default keytable also binds `<prefix> <C-Up/Down/Left/Right>` to
+`resize-pane`, same as on Windows/Linux — but on macOS, `Ctrl+Left`/`Ctrl+Right`
+is Mission Control's "Move left/right a space" (`System Settings → Keyboard →
+Keyboard Shortcuts → Mission Control`), which intercepts the chord before it
+ever reaches the terminal, so tmux never sees it. Either free the shortcut
+there, or just use **`<prefix> H J K L`** above — a bare letter, so macOS has
+nothing to intercept.
+
 A note on `<C-l>`: oh-my-tmux binds it globally (no prefix) to also wipe the
 pane's history, so it is slightly heavier than a bare shell clear.
 
