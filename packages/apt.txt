@@ -7,6 +7,8 @@
 #             modules/30-editor.sh installs a pinned official release.
 #   sudo    - must already exist; the test container provides it so that
 #             nothing this file is responsible for is pre-provisioned.
+#   gh      - 22.04's apt gh is the universe archive's old snapshot;
+#             modules/40-tools.sh adds GitHub's own apt repo instead.
 
 # shell + terminal
 zsh

@@ -42,7 +42,16 @@ install_ccstatusline() {
         return 0
     fi
     log "Installing ccstatusline..."
-    run npm install -g ccstatusline || warn "ccstatusline install failed."
+    # On Linux, Node comes from NodeSource's apt package, whose global prefix
+    # (/usr/lib/node_modules) is root-owned - `npm install -g` as the normal
+    # user fails EACCES (verified: this was silently broken until a presence
+    # check was added). Homebrew's Node on macOS is user-owned, so sudo there
+    # would instead leave root-owned files in a brew-managed directory.
+    if is_macos; then
+        run npm install -g ccstatusline || warn "ccstatusline install failed."
+    else
+        as_root npm install -g ccstatusline || warn "ccstatusline install failed."
+    fi
 }
 
 # ------------------------------------------------------------------
