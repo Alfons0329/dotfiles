@@ -209,6 +209,12 @@ check "nvim >= 0.11"          '[ "$(nvim --version | head -1 | sed "s/^NVIM v[0-
 check "config dir symlinked"  "[ -L $HOME/.config/nvim ]"
 check "init.lua present"      "[ -f $HOME/.config/nvim/init.lua ]"
 check "lazy.nvim bootstrapped" "[ -d $HOME/.local/share/nvim/lazy/lazy.nvim ]"
+check "vim/vi alias to nvim in zsh" "zsh -ic 'which vim' 2>/dev/null | grep -q nvim"
+# git's own editor precedence (GIT_EDITOR > core.editor > $VISUAL > $EDITOR > vi)
+# is what `git rebase -i` actually consults - ask git directly rather than
+# grepping ~/.gitconfig for core.editor, which would pass even if $VISUAL/
+# $EDITOR shadowed it with something else.
+check "git rebase editor is nvim" "git var GIT_EDITOR 2>/dev/null | grep -q nvim"
 
 # The colorscheme is chosen by install.sh --theme and recorded in
 # ~/.dotfiles_theme (default tokyonight). Resolve the plugin + colorscheme
