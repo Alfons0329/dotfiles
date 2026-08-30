@@ -46,6 +46,8 @@ check "tig"                  "command -v tig"
 check "vim"                  "command -v vim"
 check "bat (or batcat shim)" "command -v bat || command -v batcat"
 check "node >= 18"           '[ "$(node --version | sed "s/^v\([0-9]*\).*/\1/")" -ge 18 ]'
+check "gh (GitHub CLI)"      "command -v gh && gh --version"
+check "gws (Google Workspace CLI)" "command -v gws && gws --version"
 
 # ------------------------------------------------------------------
 section "Search tools"
@@ -331,6 +333,7 @@ section "Claude Code"
 check "claude installed"        "command -v claude || [ -x $HOME/.local/bin/claude ]"
 check "notifier script"         "[ -x $HOME/.local/bin/claude-notify.sh ]"
 check "settings.json is valid"  "python3 -c 'import json;json.load(open(\"$HOME/.claude/settings.json\"))'"
+check "ccstatusline installed"  "command -v ccstatusline"
 check "statusLine configured"   "grep -q ccstatusline $HOME/.claude/settings.json"
 check "Stop hook wired"         "grep -q claude-notify $HOME/.claude/settings.json"
 check "eli5 output style linked"      "[ -L $HOME/.claude/output-styles/eli5.md ]"

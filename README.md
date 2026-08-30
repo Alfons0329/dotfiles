@@ -60,7 +60,7 @@ Modules run in this order, and each is also a standalone script:
 | `shell` | zsh, oh-my-zsh, starship prompt (or bullet-train with `--powerline`), plugins, login shell |
 | `tmux` | oh-my-tmux + tmux-resurrect |
 | `editor` | Neovim + its Lua config; a separate `.vimrc` for plain vim |
-| `tools` | fzf with key bindings, fd, Node.js |
+| `tools` | fzf with key bindings, fd, Node.js, gh, gws |
 | `claude` | Claude Code, ccstatusline, completion notifications |
 | `claude-output-styles` | Claude Code output styles (`~/.claude/output-styles`) |
 | `desktop` | macOS only: terminal, fonts, system monitor, iTerm2 profile |
@@ -106,7 +106,9 @@ corporate proxy.
 [the_silver_searcher](https://github.com/ggreer/the_silver_searcher) (`ag`),
 [fd](https://github.com/sharkdp/fd),
 [bat](https://github.com/sharkdp/bat), [jq](https://jqlang.github.io/jq/),
-[tig](https://jonas.github.io/tig/), Node.js.
+[tig](https://jonas.github.io/tig/), Node.js,
+[gh](https://cli.github.com/) (GitHub CLI),
+[gws](https://github.com/googleworkspace/cli) (Google Workspace CLI).
 
 **AI tooling** — [Claude Code](https://claude.com/claude-code),
 [ccstatusline](https://www.npmjs.com/package/ccstatusline), and a Stop-hook
