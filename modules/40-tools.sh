@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# modules/40-tools.sh - fzf (with shell key bindings), Node.js.
+# modules/40-tools.sh - fzf (with shell key bindings), Node.js, gh, gws.
 #
-# ag and ripgrep come from the package manifests; this module handles the two
+# ag and ripgrep come from the package manifests; this module handles the
 # tools that need more than an install line.
 set -euo pipefail
 
@@ -121,10 +121,79 @@ install_nodejs() {
     as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
 }
 
+# ------------------------------------------------------------------
+# GitHub CLI (gh)
+#
+# Ubuntu 22.04 does carry a `gh` package, but it's the universe archive's
+# snapshot and lags upstream releases; GitHub's own apt repo tracks current
+# releases and is what upstream recommends, so this adds it the same way
+# NodeSource is added for Node.js above. macOS gets it from packages/brew.txt.
+# ------------------------------------------------------------------
+install_gh() {
+    if have gh; then
+        skip "gh already installed"
+        return 0
+    fi
+
+    is_macos && return 0  # installed from packages/brew.txt
+
+    log "Installing GitHub CLI from its official apt repo..."
+    local tmp
+    tmp="$(mktemp -d)"
+    # shellcheck disable=SC2064
+    trap "rm -rf '$tmp'" RETURN
+
+    if ! fetch "https://cli.github.com/packages/githubcli-archive-keyring.gpg" "$tmp/githubcli-archive-keyring.gpg"; then
+        warn "Could not fetch the GitHub CLI signing key; skipping gh."
+        return 0
+    fi
+
+    as_root mkdir -p -m 755 /etc/apt/keyrings
+    as_root install -o root -g root -m 644 \
+        "$tmp/githubcli-archive-keyring.gpg" /etc/apt/keyrings/githubcli-archive-keyring.gpg
+    run_sh "echo 'deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main' | $SUDO tee /etc/apt/sources.list.d/github-cli.list > /dev/null"
+    as_root apt-get update
+    as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y gh \
+        || warn "apt install of gh failed."
+}
+
+# ------------------------------------------------------------------
+# Google Workspace CLI (gws)
+#
+# https://github.com/googleworkspace/cli - Drive/Gmail/Calendar/Sheets/Docs/
+# Chat/Admin from one binary. Installed via npm rather than the brew formula
+# that also exists, so macOS and Linux take the exact same path - same
+# reasoning as ccstatusline in modules/50-claude.sh. Needs install_nodejs to
+# have already run.
+# ------------------------------------------------------------------
+install_gws() {
+    if have gws; then
+        skip "gws already installed"
+        return 0
+    fi
+    if ! have npm; then
+        warn "npm not found; skipping gws."
+        return 0
+    fi
+    log "Installing gws (Google Workspace CLI)..."
+    # On Linux, Node comes from NodeSource's apt package, whose global prefix
+    # (/usr/lib/node_modules) is root-owned - `npm install -g` as the normal
+    # user fails EACCES (verified). Homebrew's Node on macOS is user-owned,
+    # so sudo there would instead leave root-owned files in a brew-managed
+    # directory, which is its own kind of broken.
+    if is_macos; then
+        run npm install -g @googleworkspace/cli || warn "npm install of gws failed."
+    else
+        as_root npm install -g @googleworkspace/cli || warn "npm install of gws failed."
+    fi
+}
+
 main() {
     install_fzf
     install_fd
     install_nodejs
+    install_gh
+    install_gws
 }
 
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then

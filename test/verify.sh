@@ -46,6 +46,8 @@ check "tig"                  "command -v tig"
 check "vim"                  "command -v vim"
 check "bat (or batcat shim)" "command -v bat || command -v batcat"
 check "node >= 18"           '[ "$(node --version | sed "s/^v\([0-9]*\).*/\1/")" -ge 18 ]'
+check "gh (GitHub CLI)"      "command -v gh && gh --version"
+check "gws (Google Workspace CLI)" "command -v gws && gws --version"
 
 # ------------------------------------------------------------------
 section "Search tools"
@@ -207,6 +209,12 @@ check "nvim >= 0.11"          '[ "$(nvim --version | head -1 | sed "s/^NVIM v[0-
 check "config dir symlinked"  "[ -L $HOME/.config/nvim ]"
 check "init.lua present"      "[ -f $HOME/.config/nvim/init.lua ]"
 check "lazy.nvim bootstrapped" "[ -d $HOME/.local/share/nvim/lazy/lazy.nvim ]"
+check "vim/vi alias to nvim in zsh" "zsh -ic 'which vim' 2>/dev/null | grep -q nvim"
+# git's own editor precedence (GIT_EDITOR > core.editor > $VISUAL > $EDITOR > vi)
+# is what `git rebase -i` actually consults - ask git directly rather than
+# grepping ~/.gitconfig for core.editor, which would pass even if $VISUAL/
+# $EDITOR shadowed it with something else.
+check "git rebase editor is nvim" "git var GIT_EDITOR 2>/dev/null | grep -q nvim"
 
 # The colorscheme is chosen by install.sh --theme and recorded in
 # ~/.dotfiles_theme (default tokyonight). Resolve the plugin + colorscheme
@@ -331,6 +339,7 @@ section "Claude Code"
 check "claude installed"        "command -v claude || [ -x $HOME/.local/bin/claude ]"
 check "notifier script"         "[ -x $HOME/.local/bin/claude-notify.sh ]"
 check "settings.json is valid"  "python3 -c 'import json;json.load(open(\"$HOME/.claude/settings.json\"))'"
+check "ccstatusline installed"  "command -v ccstatusline"
 check "statusLine configured"   "grep -q ccstatusline $HOME/.claude/settings.json"
 check "Stop hook wired"         "grep -q claude-notify $HOME/.claude/settings.json"
 check "eli5 output style linked"      "[ -L $HOME/.claude/output-styles/eli5.md ]"

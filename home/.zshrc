@@ -118,7 +118,9 @@ export GOPATH="$HOME/go"
 if (( $+commands[nvim] )); then
     export EDITOR=nvim
     export VISUAL=nvim
+    export SUDO_EDITOR=nvim   # sudoedit / visudo -e
     alias vi=nvim
+    alias vim=nvim
 else
     export EDITOR=vim
     export VISUAL=vim

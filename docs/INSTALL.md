@@ -15,8 +15,8 @@ standalone script with its own `main()`.
 | `packages` | System packages from `packages/*.txt`, locale |
 | `shell` | zsh, oh-my-zsh, starship prompt (or bullet-train with `--powerline`), plugins, login shell |
 | `tmux` | oh-my-tmux + tmux-resurrect |
-| `editor` | Neovim + its Lua config; a separate `.vimrc` for plain vim |
-| `tools` | fzf with key bindings, fd, Node.js |
+| `editor` | Neovim + its Lua config, a separate `.vimrc` for plain vim, and nvim set as the default editor for git/sudoedit/crontab |
+| `tools` | fzf with key bindings, fd, Node.js, gh, gws |
 | `claude` | Claude Code, ccstatusline, completion notifications |
 | `desktop` | macOS only: terminal, fonts, system monitor, iTerm2 profile |
 | `ghostty` | macOS only: opt-in patched Ghostty build — asks first |
@@ -43,6 +43,24 @@ package per line, `#` comments. Two naming traps are handled there and in
   `fzf --zsh`, so `modules/40-tools.sh` installs it from git instead.
 - **neovim** — deliberately *not* in `apt.txt`: 22.04 ships 0.6.1, far too old
   for the Lua config, so `modules/30-editor.sh` installs a pinned release.
+- **gh** — deliberately *not* in `apt.txt`: 22.04's apt `gh` is the universe
+  archive's old snapshot, so `install_gh()` adds GitHub's own apt repo
+  instead and installs from there. macOS gets it from `brew.txt` directly.
+- **gws** — not in either manifest. [`googleworkspace/cli`](https://github.com/googleworkspace/cli)
+  has a brew formula too, but `install_gws()` installs it via `npm install -g
+  @googleworkspace/cli` on both platforms so macOS and Linux take the exact
+  same path — same reasoning as `ccstatusline` in `modules/50-claude.sh`.
+
+## Default editor everywhere
+
+`~/.zshrc` exports `$EDITOR`/`$VISUAL` as nvim, but that only reaches tools
+launched from an interactive zsh. `modules/30-editor.sh`'s
+`configure_default_editor()` closes the rest: `git config --global
+core.editor nvim` (git's own precedence is `GIT_EDITOR` > `core.editor` >
+`$VISUAL` > `$EDITOR` > `vi`, so this wins regardless of which shell invoked
+git), and on Linux, `update-alternatives --set editor nvim` — what Debian's
+`sensible-editor` falls back to for `crontab -e` and `sudoedit` when neither
+env var is set, defaulting to nano otherwise.
 
 ## Neovim version pin
 
