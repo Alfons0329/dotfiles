@@ -59,7 +59,7 @@ Modules run in this order, and each is also a standalone script:
 | `packages` | System packages from `packages/*.txt`, locale |
 | `shell` | zsh, oh-my-zsh, starship prompt (or bullet-train with `--powerline`), plugins, login shell |
 | `tmux` | oh-my-tmux + tmux-resurrect |
-| `editor` | Neovim + its Lua config; a separate `.vimrc` for plain vim |
+| `editor` | Neovim + its Lua config, a separate `.vimrc` for plain vim, and nvim set as the default editor for git/sudoedit/crontab |
 | `tools` | fzf with key bindings, fd, Node.js, gh, gws |
 | `claude` | Claude Code, ccstatusline, completion notifications |
 | `claude-output-styles` | Claude Code output styles (`~/.claude/output-styles`) |

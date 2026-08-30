@@ -242,11 +242,37 @@ DOTFILES_THEME="$theme"
 EOF
 }
 
+# ------------------------------------------------------------------
+# Make nvim the default editor outside the shell too.
+#
+# ~/.zshrc exports $EDITOR/$VISUAL, but that only reaches tools invoked from
+# an interactive zsh. git's own editor precedence (GIT_EDITOR > core.editor >
+# $VISUAL > $EDITOR > vi) skips straight past unset env vars in any other
+# context, and Debian/Ubuntu's `sensible-editor` - what `crontab -e` and
+# `sudoedit` fall back to - ignores $EDITOR entirely if it wasn't exported by
+# whatever invoked it, instead reading `update-alternatives --config editor`,
+# which defaults to nano on a fresh Ubuntu install. Both get set explicitly so
+# "the git rebase editor" and "crontab -e" stop being nano regardless of which
+# shell (or none) invoked them.
+# ------------------------------------------------------------------
+configure_default_editor() {
+    have nvim || { warn "nvim not found; leaving the default editor unset."; return 0; }
+
+    log "Setting nvim as the default editor (git, sudoedit, crontab -e)..."
+    run git config --global core.editor nvim
+
+    if is_linux && have update-alternatives; then
+        as_root update-alternatives --install /usr/bin/editor editor "$(command -v nvim)" 60
+        as_root update-alternatives --set editor "$(command -v nvim)"
+    fi
+}
+
 main() {
     install_neovim
     check_neovim_version
     deploy_configs
     write_theme_marker
+    configure_default_editor
     sync_plugins
     report_treesitter_parsers
     install_lsp_servers
