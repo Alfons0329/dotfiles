@@ -341,9 +341,76 @@ check "notifier script"         "[ -x $HOME/.local/bin/claude-notify.sh ]"
 check "settings.json is valid"  "python3 -c 'import json;json.load(open(\"$HOME/.claude/settings.json\"))'"
 check "ccstatusline installed"  "command -v ccstatusline"
 check "statusLine configured"   "grep -q ccstatusline $HOME/.claude/settings.json"
+# This one is also the herdr regression guard. `herdr integration install
+# claude` writes its own hook into the same settings.json, and if a future
+# release starts rewriting that file instead of merging into it, the completion
+# notifier dies with no other symptom. Verified as merging at herdr 0.8.2; this
+# check is what notices when that stops being true.
 check "Stop hook wired"         "grep -q claude-notify $HOME/.claude/settings.json"
 check "eli5 output style linked"      "[ -L $HOME/.claude/output-styles/eli5.md ]"
 check "eli5 output style frontmatter" "head -5 $HOME/.claude/output-styles/eli5.md | grep -qx 'name: ELI5'"
+
+# ------------------------------------------------------------------
+section "herdr"
+# ------------------------------------------------------------------
+# herdr.dev's installer puts the binary in ~/.local/bin, which ~/.zshrc puts
+# first on PATH - but in the Docker build this script runs under /bin/sh, which
+# never reads ~/.zshrc, so it is not on PATH here. `command -v herdr` alone
+# therefore fails on a machine where herdr is installed and working. Resolve
+# the binary once instead of repeating the `|| [ -x ... ]` dance in each check.
+HERDR_BIN="$(command -v herdr 2>/dev/null || echo "$HOME/.local/bin/herdr")"
+
+check "herdr installed"         "$HERDR_BIN --version"
+# Ask the binary to print its own defaults rather than grepping our template:
+# config.toml.example explains the prefix choice in a comment that contains the
+# word "prefix", so a grep for it would pass on the comment alone. Anchor on
+# the section headers, which are the only uncommented lines herdr emits.
+check "herdr parses a config"   "$HERDR_BIN --default-config | grep -q '^\[keys\]'"
+check "herdr config seeded"     "[ -f $HOME/.config/herdr/config.toml ]"
+# The Claude Code integration is the whole point of installing herdr here -
+# without it the sidebar guesses agent state by scraping the screen. It is also
+# the part that silently does not happen: the first Docker build produced a
+# container with herdr installed, no integration, and a green test suite,
+# because the module could not see the binary it had just installed and the
+# only check that would have caught it was the Stop-hook one - which passes
+# happily when herdr never ran at all. Ask herdr directly.
+check "herdr Claude Code integration installed" \
+      "$HERDR_BIN integration status 2>/dev/null | grep -q '^claude: current'"
+check "herdr config is a real file, not a symlink into the repo" \
+      "[ ! -L $HOME/.config/herdr/config.toml ]"
+
+# The behavioural one. `command -v herdr` would pass on a binary that cannot
+# run at all - which is the likelier failure here than a missing file, since
+# this is a prebuilt Rust binary landing on whatever glibc the machine has.
+# So: start a headless server, talk to it over its own socket, make it create
+# a workspace, and shut it down.
+#
+# Runs on its own session name, which is a separate socket and a separate
+# runtime namespace, so it cannot disturb a real session. Runs in a subshell
+# for the same reason as the tmux.conf.user check above: check() eval's this
+# string in the current shell, so the bare `exit` carrying the result out would
+# otherwise take verify.sh down with it.
+check "herdr server starts, serves its socket, and stops" \
+      "$(cat <<'HERDRSRV'
+      (
+        PATH="$HOME/.local/bin:$PATH"
+        export HERDR_SESSION=verify_herdr
+        herdr server >/dev/null 2>&1 &
+        # Bounded wait: a server that never comes up must fail this check, not
+        # hang the Docker build.
+        for _ in 1 2 3 4 5 6 7 8 9 10; do
+            herdr status server 2>/dev/null | grep -q '^status: running' && break
+            sleep 1
+        done
+        herdr workspace create --label verify --cwd "$HOME" >/dev/null 2>&1 &&
+        herdr pane list 2>/dev/null | grep -q pane_list
+        _rc=$?
+        herdr server stop >/dev/null 2>&1
+        rm -rf "$HOME/.config/herdr/sessions/verify_herdr"
+        exit $_rc
+      )
+HERDRSRV
+)"
 
 # ------------------------------------------------------------------
 if $IS_MACOS; then

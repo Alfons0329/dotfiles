@@ -29,6 +29,7 @@ The README is the starting point; each subsystem has its own page:
 | **[docs/NEOVIM.md](docs/NEOVIM.md)** | Editor keys as a VSCode→Neovim map, and the tmux-safe subset (`gd`/`<C-o>`, `<M-1..9>`, `<C-n>` sidebar) |
 | **[docs/TERMINAL.md](docs/TERMINAL.md)** | Ghostty, iTerm2, tmux keys, fonts, locale, truecolor, themes |
 | **[docs/INSTALL.md](docs/INSTALL.md)** | Modules, package manifests, version pins, the test suite |
+| **[docs/herdr-loop-eng-tutorial.md](docs/herdr-loop-eng-tutorial.md)** | Running a staged, one-session-per-stage agent workflow on herdr instead of tmux windows |
 
 ## Options
 
@@ -63,6 +64,7 @@ Modules run in this order, and each is also a standalone script:
 | `tools` | fzf with key bindings, fd, Node.js, gh, gws |
 | `claude` | Claude Code, ccstatusline, completion notifications |
 | `claude-output-styles` | Claude Code output styles (`~/.claude/output-styles`) |
+| `herdr` | herdr, an agent-aware multiplexer installed alongside tmux, not instead of it |
 | `desktop` | macOS only: terminal, fonts, system monitor, iTerm2 profile |
 | `ghostty` | macOS only: opt-in patched Ghostty build — asks first |
 
@@ -114,6 +116,13 @@ corporate proxy.
 [ccstatusline](https://www.npmjs.com/package/ccstatusline), and a Stop-hook
 notifier that announces when a turn finishes (Notification Center on macOS,
 `notify-send` on a Linux desktop, OSC 9 to the terminal from a VM or over SSH).
+
+Plus [herdr](https://herdr.dev), a multiplexer that tracks whether each agent
+pane is working, blocked or done and shows that in a sidebar — the thing tmux
+cannot tell you when four agents are running at once. It is installed
+*alongside* tmux and changes nothing about it; you opt in by typing `herdr`.
+[docs/herdr-loop-eng-tutorial.md](docs/herdr-loop-eng-tutorial.md) covers
+running a staged workflow on it.
 
 ## Key bindings — the daily five
 
