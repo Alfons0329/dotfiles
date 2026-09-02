@@ -1,0 +1,43 @@
+# herdr configuration - https://herdr.dev/docs/configuration/
+#
+# Seeded ONCE to ~/.config/herdr/config.toml by modules/52-herdr.sh and never
+# overwritten afterwards, so anything you change here stays changed.
+#
+# Every other tool in this repo gets a tracked config symlinked into $HOME plus
+# a separate gitignored file for machine-local deviation (~/.zshrc.local,
+# ~/.tmux.conf.user, lua/config/local.lua, ghostty-local.conf). herdr cannot
+# work that way: config.toml has no include/import directive, so there is
+# nowhere for a second file to be layered on top. A tracked symlink would
+# therefore force every per-machine tweak to dirty the dotfiles checkout - and
+# get clobbered on the next `git pull`. So the deployed copy is the local file,
+# and this is only its starting point.
+#
+# Re-print the full set of defaults at any time with:
+#   herdr --default-config
+# Apply edits to an already-running server without restarting it:
+#   herdr server reload-config
+
+[keys]
+# ctrl+b deliberately, which is also tmux's prefix on this machine
+# (.tmux.conf.local leaves gpakosz's C-a swap commented out). Both
+# multiplexers therefore answer to the same muscle memory, and you never have
+# to remember which one you are attached to.
+#
+# The one case where that bites is nesting - a herdr client running inside a
+# tmux pane, or the reverse, where the outer multiplexer eats the prefix first.
+# Change this line if you actually do that; don't change it pre-emptively.
+prefix = "ctrl+b"
+
+[theme]
+# Rewritten by modules/52-herdr.sh from --theme at seed time. herdr ships
+# built-ins for tokyonight (as "tokyo-night") and kanagawa but not ayu-dark,
+# which is left on this value rather than approximated. `herdr
+# --default-config` lists the full set.
+name = "tokyo-night"
+
+[session]
+# Reattach a coding agent to its conversation when the server comes back after
+# a restart, rather than leaving a dead pane. This resumes the SAME agent in
+# the SAME pane, which is why it is safe for a staged workflow where each stage
+# must be its own fresh session - see docs/herdr-loop-eng-tutorial.md.
+resume_agents_on_restore = true

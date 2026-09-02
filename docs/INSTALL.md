@@ -18,6 +18,8 @@ standalone script with its own `main()`.
 | `editor` | Neovim + its Lua config, a separate `.vimrc` for plain vim, and nvim set as the default editor for git/sudoedit/crontab |
 | `tools` | fzf with key bindings, fd, Node.js, gh, gws |
 | `claude` | Claude Code, ccstatusline, completion notifications |
+| `claude-output-styles` | Claude Code output styles (`~/.claude/output-styles`) |
+| `herdr` | herdr, an agent-aware multiplexer installed alongside tmux, plus its Claude Code integration |
 | `desktop` | macOS only: terminal, fonts, system monitor, iTerm2 profile |
 | `ghostty` | macOS only: opt-in patched Ghostty build — asks first |
 
@@ -61,6 +63,40 @@ core.editor nvim` (git's own precedence is `GIT_EDITOR` > `core.editor` >
 git), and on Linux, `update-alternatives --set editor nvim` — what Debian's
 `sensible-editor` falls back to for `crontab -e` and `sudoedit` when neither
 env var is set, defaulting to nano otherwise.
+
+## herdr, and why its config is not a symlink
+
+`modules/52-herdr.sh` is numbered after `50-claude.sh` rather than next to
+`20-tmux.sh`, even though [herdr](https://herdr.dev) is a multiplexer:
+`herdr integration install claude` needs Claude Code on the box already, and
+module order is the only dependency mechanism this installer has. Nothing in
+the module touches tmux — herdr is installed *alongside* it and is entered by
+typing `herdr`. The workflow it is meant to serve is
+[herdr-loop-eng-tutorial.md](herdr-loop-eng-tutorial.md).
+
+Not in either package manifest: macOS gets `brew install herdr`
+(homebrew-core), Linux gets `herdr.dev/install.sh`, which is POSIX `sh`, needs
+only `curl` and `awk`, checks the download against a SHA-256 from the release
+manifest, and installs to `~/.local/bin` — already first on `$PATH`. No version
+pin, unlike Neovim: there is no known version constraint here, and pinning
+would put installs and `herdr update` on different manifests.
+
+`~/.config/herdr/config.toml` is **seeded once** from
+`home/.config/herdr/config.toml.example` and never overwritten — the
+`~/.zshrc.local` pattern, not the symlink pattern used for `.tmux.conf.local`
+and the Ghostty config. herdr's config has no `include` directive, so a
+gitignored override file has nowhere to be layered from, and a tracked symlink
+would mean every per-machine tweak dirties this checkout and dies on the next
+`git pull`. The cost is that a later `--theme` change does not rewrite an
+existing config; the module says so rather than clobbering it.
+
+The Claude Code integration writes a `SessionStart` hook into
+`~/.claude/settings.json`, which `modules/50-claude.sh` also writes (the
+Stop-hook notifier). Verified at herdr 0.8.2 that it merges rather than
+rewrites, leaving the notifier intact. `test/verify.sh`'s "Stop hook wired"
+check is the guard for that: if a future herdr release starts rewriting the
+file, notifications stop working with no other symptom, and that check is what
+notices.
 
 ## Neovim version pin
 
