@@ -104,6 +104,10 @@ nothing to intercept.
 A note on `<C-l>`: oh-my-tmux binds it globally (no prefix) to also wipe the
 pane's history, so it is slightly heavier than a bare shell clear.
 
+herdr, the agent-aware multiplexer installed alongside tmux, uses the same
+`<C-b>` prefix on purpose — but seven of the second keys differ from the table
+above. [herdr-shortcut.md](herdr-shortcut.md) is that diff.
+
 These are **tmux** windows and panes — a layer above Neovim's tabs and splits.
 `<C-Tab>` cycles tmux's own windows, which is why it never reaches Neovim's
 tabs inside tmux; see [NEOVIM.md](NEOVIM.md) for the editor-side keys that do.
