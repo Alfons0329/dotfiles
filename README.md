@@ -132,7 +132,9 @@ And [codegraph](https://github.com/colbymchenry/codegraph), a pre-indexed code
 graph wired into Claude Code as a global MCP server, so an agent can ask for a
 symbol's callers or a change's blast radius in one call instead of grepping its
 way there. The installer only wires the agent up; building a repo's index is
-`codegraph init` inside it, which stays manual.
+`codegraph init` inside it, which stays manual. codegraph ships with anonymous
+telemetry on — `modules/53-codegraph.sh` turns it off before wiring anything,
+because `codegraph install` reports an event of its own.
 
 ## Key bindings — the daily five
 

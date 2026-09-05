@@ -54,6 +54,32 @@ install_codegraph() {
 }
 
 # ------------------------------------------------------------------
+# Opt out of telemetry.
+#
+# codegraph collects anonymous usage stats by default - the first run prints a
+# notice saying so and carries on. One of the events it reports fires from
+# `codegraph install` itself ("which agents were configured"), which is why this
+# runs BEFORE wire_claude rather than at the end of the module: afterwards would
+# be too late to prevent the only event this installer causes.
+#
+# `codegraph telemetry off` persists the choice to ~/.codegraph/telemetry.json
+# ("enabled": false, "consent_source": "cli") and deletes anything already
+# queued. It is idempotent and sends nothing itself, so it is deliberately not
+# guarded by an "is it already off?" check - running it unconditionally is both
+# simpler than parsing that file and correct on a machine where codegraph was
+# installed by hand before this module ever ran.
+# ------------------------------------------------------------------
+disable_telemetry() {
+    if [ "$DRY_RUN" != "1" ] && ! have codegraph; then
+        return 0
+    fi
+
+    step "codegraph telemetry -> off"
+    run codegraph telemetry off \
+        || warn "could not disable codegraph telemetry; run 'codegraph telemetry off' by hand."
+}
+
+# ------------------------------------------------------------------
 # Wire the MCP server into Claude Code.
 #
 # `codegraph install` writes three things: the MCP server into ~/.claude.json,
@@ -119,6 +145,9 @@ PY
 
 main() {
     install_codegraph || return 0
+    # Before wire_claude, not after - `codegraph install` reports a telemetry
+    # event of its own, so the order here is the whole point.
+    disable_telemetry
     wire_claude
 }
 
