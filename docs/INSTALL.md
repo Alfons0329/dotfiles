@@ -20,6 +20,7 @@ standalone script with its own `main()`.
 | `claude` | Claude Code, ccstatusline, completion notifications |
 | `claude-output-styles` | Claude Code output styles (`~/.claude/output-styles`) |
 | `herdr` | herdr, an agent-aware multiplexer installed alongside tmux, plus its Claude Code integration |
+| `codegraph` | codegraph, wired into Claude Code as a global MCP server. Does not index anything — that is `codegraph init`, per repo |
 | `desktop` | macOS only: terminal, fonts, system monitor, iTerm2 profile |
 | `ghostty` | macOS only: opt-in patched Ghostty build — asks first |
 

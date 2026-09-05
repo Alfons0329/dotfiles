@@ -39,7 +39,9 @@ Modules (in run order):
   editor     Neovim (pinned release) + native Lua config; plain vim gets its own .vimrc
   tools      fzf (Ctrl+R/Ctrl+T/Alt+C), ag, ripgrep, Node.js
   claude     Claude Code, ccstatusline, completion notifications
+  claude-output-styles  Claude Code output styles (~/.claude/output-styles)
   herdr      herdr, an agent-aware multiplexer (does not replace tmux)
+  codegraph  codegraph, wired into Claude Code as a global MCP server
   desktop    macOS only: fonts, terminal config, iTerm2 profile
   ghostty    macOS only: opt-in patched Ghostty build (asks first)
 

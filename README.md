@@ -67,6 +67,7 @@ Modules run in this order, and each is also a standalone script:
 | `claude` | Claude Code, ccstatusline, completion notifications |
 | `claude-output-styles` | Claude Code output styles (`~/.claude/output-styles`) |
 | `herdr` | herdr, an agent-aware multiplexer installed alongside tmux, not instead of it |
+| `codegraph` | codegraph, wired into Claude Code as a global MCP server |
 | `desktop` | macOS only: terminal, fonts, system monitor, iTerm2 profile |
 | `ghostty` | macOS only: opt-in patched Ghostty build — asks first |
 
@@ -124,7 +125,14 @@ pane is working, blocked or done and shows that in a sidebar — the thing tmux
 cannot tell you when four agents are running at once. It is installed
 *alongside* tmux and changes nothing about it; you opt in by typing `herdr`.
 [docs/herdr-loop-eng-tutorial.md](docs/herdr-loop-eng-tutorial.md) covers
-running a staged workflow on it.
+running a staged workflow on it, and
+[docs/herdr-shortcut.md](docs/herdr-shortcut.md) the keys.
+
+And [codegraph](https://github.com/colbymchenry/codegraph), a pre-indexed code
+graph wired into Claude Code as a global MCP server, so an agent can ask for a
+symbol's callers or a change's blast radius in one call instead of grepping its
+way there. The installer only wires the agent up; building a repo's index is
+`codegraph init` inside it, which stays manual.
 
 ## Key bindings — the daily five
 
