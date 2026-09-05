@@ -455,6 +455,25 @@ CGWIRE
 check "codegraph wiring stayed global, not project-local" \
       "[ ! -f $HOME/.mcp.json ]"
 
+# codegraph ships with telemetry ON and reports an event from `codegraph install`
+# itself, so modules/53-codegraph.sh opts out before it wires anything. Assert
+# the stored decision rather than that the command was called: `telemetry off`
+# writes "enabled": false with "consent_source": "cli", and only the file proves
+# it stuck. A machine that somehow re-enabled it fails here.
+check "codegraph telemetry is off" \
+      "$(cat <<'CGTELEM'
+      python3 - <<'PY'
+import json, os, sys
+try:
+    with open(os.path.expanduser("~/.codegraph/telemetry.json")) as fh:
+        data = json.load(fh)
+except (OSError, ValueError):
+    sys.exit(1)
+sys.exit(0 if data.get("enabled") is False else 1)
+PY
+CGTELEM
+)"
+
 # ------------------------------------------------------------------
 if $IS_MACOS; then
 section "macOS extras"
