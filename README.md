@@ -22,10 +22,9 @@ and the GUI modules are skipped.
 
 ## A brand-new Mac, start to finish
 
-The two-line quickstart assumes `git` exists. On a Mac out of the box it does
-not: `/usr/bin/git` is a stub that opens a GUI dialog instead of cloning, so the
-clone is the step that fails first. Install the Command Line Tools ahead of it
-and the rest runs unattended.
+The quickstart assumes `git` exists. On a Mac out of the box it does not — see
+[Why the Command Line Tools come first](#why-the-command-line-tools-come-first)
+— so the clone is the step that fails, before the installer ever runs:
 
 ```sh
 xcode-select --install        # GUI dialog. Wait for it to finish.
@@ -37,14 +36,6 @@ Add `--theme kanagawa` or `--theme ayu-dark` to that last line if you don't want
 the default tokyonight; it sets Neovim and the terminal together, and it is
 read once at install time, so choosing here is cheaper than changing later.
 
-Clone over **HTTPS, not SSH**. A new laptop has no key registered with GitHub
-yet, so `git@github.com:…` fails at step one of a script whose whole promise is
-that you start it and walk away. Swap the remote afterwards if you want to push:
-
-```sh
-git -C ~/dotfiles remote set-url origin git@github.com:Alfons0329/dotfiles.git
-```
-
 **It stops for your password twice**, and `--yes` will not prevent either:
 Homebrew's own installer asks, and so does the login-shell change (`chsh`).
 `--yes` only answers *this* script's prompts, which on macOS is just the
@@ -52,16 +43,55 @@ optional Ghostty build. Everything else — Homebrew, the Brewfile packages, a
 pinned Neovim, the Node toolchain, language servers — is download-bound and
 wants roughly half an hour on a good connection.
 
-Two things to expect that are not bugs:
+### Why the Command Line Tools come first
+
+`/usr/bin/git` on a fresh Mac is not git. It, `/usr/bin/clang` and
+`/usr/bin/make` are 78 hard links to a single 118 KB binary that identifies
+itself as `com.apple.dt.xcode_select.tool-shim-public` — a launcher that opens
+the Command Line Tools installer and exits. Confirm it on any Mac with
+`ls -li /usr/bin/git /usr/bin/clang`: same inode, same link count.
+
+The tools do arrive either way, because Homebrew's installer pulls them in and
+`git` is in `packages/brew.txt`. `/usr/bin/curl` is a genuine binary rather than
+a shim, so this bootstraps with no `xcode-select` step at all:
+
+```sh
+curl -fsSL https://github.com/Alfons0329/dotfiles/archive/refs/heads/master.tar.gz | tar xz
+```
+
+Installing the tools first is still the better route, for one reason: it gets
+you a **git checkout instead of an unpacked tarball**. Everything this repo puts
+in `$HOME` is a symlink back into the checkout, so `git pull` is how config
+updates reach a machine. A tarball has no remote to pull from.
+
+### HTTPS or SSH
+
+Either. HTTPS is the default above because it needs nothing set up first — the
+repo is public, so an anonymous clone works with no credential at all. SSH needs
+a keypair on the machine *and* its public half registered on GitHub, which on a
+laptop you unboxed this morning means generating a key and pasting it into a
+browser before you can clone.
+
+If you already carried your key across, prefer SSH — you want it for pushing
+regardless. Switching afterwards is one command:
+
+```sh
+git -C ~/dotfiles remote set-url origin git@github.com:Alfons0329/dotfiles.git
+```
+
+### Two things that are not bugs
 
 - **Language servers finish after the script does.** Treesitter parsers compile
   lazily on first file open, so the first Python or TypeScript buffer you open
   is unhighlighted for a moment. Forcing them up front was tried and took 27
   minutes; [docs/INSTALL.md](docs/INSTALL.md) has the numbers.
-- **macOS is the less-tested path.** The Ubuntu path is rebuilt from a bare
-  image on every commit; macOS is covered by `--dry-run` and shellcheck only.
-  If something looks wrong, `./install.sh --only <module>` re-runs one piece
-  without redoing the whole thing.
+- **The bare-machine path is the untested part, not macOS generally.** The
+  modules themselves run on macOS routinely. What no run has exercised is a Mac
+  with *neither* Homebrew nor the Command Line Tools present, since every macOS
+  run so far started with both — so the first two steps above are the ones with
+  no track record. `modules/70-ghostty.sh` has never run at all; it asks first,
+  so declining costs nothing. `./install.sh --only <module>` re-runs one piece
+  if something looks wrong.
 
 ## Documentation
 
