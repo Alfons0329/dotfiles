@@ -128,7 +128,15 @@ apply_theme() {
 # instead of silently killing notifications.
 # ------------------------------------------------------------------
 install_claude_integration() {
-    have herdr || { warn "herdr not found; skipping the Claude Code integration."; return 0; }
+    # Guarded on DRY_RUN because a dry run never actually installed anything -
+    # install_herdr only printed the curl line - so a bare `have` here reports a
+    # missing binary on every dry run against a machine that does not yet have
+    # herdr, and makes a working module look broken. Outside a dry run the check
+    # is real, and is what catches a genuinely failed install.
+    if [ "$DRY_RUN" != "1" ] && ! have herdr; then
+        warn "herdr not found; skipping the Claude Code integration."
+        return 0
+    fi
 
     if ! have claude; then
         warn "Claude Code not found; skipping the herdr integration."
