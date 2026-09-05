@@ -28,6 +28,30 @@
 # Change this line if you actually do that; don't change it pre-emptively.
 prefix = "ctrl+b"
 
+# Deliberately no other [keys] entries. herdr's defaults and oh-my-tmux's
+# bindings already agree on `-`, h/j/k/l, c, x, z, 1..9 and ?; the rest differ
+# (split right is `v` not `_`, detach is `q` not `d`, tabs are p/n not C-h/C-l)
+# and were left alone on purpose. Seeding a remap here would only reach a *new*
+# machine - this file is copied once and never overwritten - so every existing
+# box would keep its old keys and `prefix ?` would be wrong on all of them.
+# Learn the seven differences instead; docs/herdr-shortcut.md is that list.
+
+[experimental]
+# With a non-ASCII input source active (zhTW here), the key *after* the prefix
+# never reaches herdr, so `prefix v` is indistinguishable from a dead prefix.
+# This switches the host input source to an ASCII layout only while prefix mode
+# is open, then restores it.
+#
+# Reaching for Caps Lock instead is the trap: it sends `V`, and herdr binds
+# prefix+shift+<key> to *different* actions (prefix+shift+n is new_workspace),
+# so an uppercase key matches no binding at all and still does nothing.
+#
+# Two things worth knowing. The key belongs under [experimental], NOT [keys],
+# where it parses fine and is silently ignored. And being experimental it may
+# be renamed upstream - `herdr server reload-config` reports that in its
+# `diagnostics` array, and the fallback is to switch input source by hand.
+switch_ascii_input_source_in_prefix = true
+
 [theme]
 # Rewritten by modules/52-herdr.sh from --theme at seed time. herdr ships
 # built-ins for tokyonight (as "tokyo-night") and kanagawa but not ayu-dark,
