@@ -4,7 +4,7 @@ One command turns a bare machine into my working environment. Same script on a
 headless Ubuntu build server and on a MacBook.
 
 ```sh
-git clone https://github.com/<user>/dotfiles ~/dotfiles
+git clone https://github.com/Alfons0329/dotfiles ~/dotfiles
 ~/dotfiles/install.sh
 ```
 
@@ -19,6 +19,49 @@ overwrite in `$HOME` is moved to `<file>.bak.<timestamp>` first.
 
 Headless servers need no flags: with no `DISPLAY`, `--minimal` turns itself on
 and the GUI modules are skipped.
+
+## A brand-new Mac, start to finish
+
+The two-line quickstart assumes `git` exists. On a Mac out of the box it does
+not: `/usr/bin/git` is a stub that opens a GUI dialog instead of cloning, so the
+clone is the step that fails first. Install the Command Line Tools ahead of it
+and the rest runs unattended.
+
+```sh
+xcode-select --install        # GUI dialog. Wait for it to finish.
+git clone https://github.com/Alfons0329/dotfiles ~/dotfiles
+~/dotfiles/install.sh
+```
+
+Add `--theme kanagawa` or `--theme ayu-dark` to that last line if you don't want
+the default tokyonight; it sets Neovim and the terminal together, and it is
+read once at install time, so choosing here is cheaper than changing later.
+
+Clone over **HTTPS, not SSH**. A new laptop has no key registered with GitHub
+yet, so `git@github.com:…` fails at step one of a script whose whole promise is
+that you start it and walk away. Swap the remote afterwards if you want to push:
+
+```sh
+git -C ~/dotfiles remote set-url origin git@github.com:Alfons0329/dotfiles.git
+```
+
+**It stops for your password twice**, and `--yes` will not prevent either:
+Homebrew's own installer asks, and so does the login-shell change (`chsh`).
+`--yes` only answers *this* script's prompts, which on macOS is just the
+optional Ghostty build. Everything else — Homebrew, the Brewfile packages, a
+pinned Neovim, the Node toolchain, language servers — is download-bound and
+wants roughly half an hour on a good connection.
+
+Two things to expect that are not bugs:
+
+- **Language servers finish after the script does.** Treesitter parsers compile
+  lazily on first file open, so the first Python or TypeScript buffer you open
+  is unhighlighted for a moment. Forcing them up front was tried and took 27
+  minutes; [docs/INSTALL.md](docs/INSTALL.md) has the numbers.
+- **macOS is the less-tested path.** The Ubuntu path is rebuilt from a bare
+  image on every commit; macOS is covered by `--dry-run` and shellcheck only.
+  If something looks wrong, `./install.sh --only <module>` re-runs one piece
+  without redoing the whole thing.
 
 ## Documentation
 
@@ -222,9 +265,33 @@ Two caveats worth knowing:
 
 ## After installing
 
-1. `exec zsh`
-2. `nvim`, then `:Copilot auth` — one-time GitHub login
-3. `claude` — one-time Claude Code login
+Four of these need a browser and cannot be scripted; that is the whole reason
+they are a list rather than another module.
+
+1. `exec zsh` — or just open a new tab. The login shell already changed.
+2. `nvim`, then `:Copilot auth` — one-time GitHub login.
+3. `claude` — one-time Claude Code login.
+4. `gh auth login` — only if you use `gh`; the installer places the binary and
+   stops there.
+5. Put your tokens and employer-specific paths in `~/.zshrc.local`, which was
+   seeded empty and is gitignored. Not in `~/.zshrc` — that one is public, and
+   `test/verify.sh` fails the build if a credential appears in it.
+6. `./test/verify.sh` — asserts the install actually behaves, rather than that
+   files exist. Run it before you trust the machine.
+
+Then, per repo you work in:
+
+```sh
+cd ~/some/repo && codegraph init   # build that repo's graph; the installer
+                                   # only wires the MCP server, not the index
+```
+
+herdr needs nothing: type `herdr` to enter it. Its config was seeded once to
+`~/.config/herdr/config.toml` and is **never overwritten** by a later
+`install.sh`, so edits there survive — and, for the same reason, a template
+change in this repo will not reach a machine that already has the file. Keys are
+[docs/herdr-shortcut.md](docs/herdr-shortcut.md); the mental model, if you are
+coming from tmux, is [docs/herdr-tmux-analogy.md](docs/herdr-tmux-analogy.md).
 
 ## Credits
 
