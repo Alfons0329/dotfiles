@@ -413,6 +413,68 @@ HERDRSRV
 )"
 
 # ------------------------------------------------------------------
+section "codegraph"
+# ------------------------------------------------------------------
+# Same PATH problem as herdr: the vendor installer targets ~/.local/bin, which
+# ~/.zshrc puts first on $PATH for a login shell, and this script runs under
+# /bin/sh in the Docker build and never reads ~/.zshrc.
+CODEGRAPH_BIN="$(command -v codegraph 2>/dev/null || echo "$HOME/.local/bin/codegraph")"
+
+# --version rather than a file test: this is a prebuilt binary with a bundled
+# Node runtime, so "downloaded but cannot execute here" is the likely failure,
+# exactly as for herdr and Neovim.
+check "codegraph installed"     "$CODEGRAPH_BIN --version"
+
+# The wiring is the part that silently does not happen - it is skipped whenever
+# the module cannot see the binary it just installed. Parse ~/.claude.json for
+# the mcpServers entry rather than grepping it for "codegraph": that file also
+# records a history entry per project directory, so a bare string match would
+# pass on any machine that has ever cd'd into a path containing the word.
+check "codegraph wired into Claude Code as an MCP server" \
+      "$(cat <<'CGWIRE'
+      python3 - <<'PY'
+import json, os, sys
+try:
+    with open(os.path.expanduser("~/.claude.json")) as fh:
+        data = json.load(fh)
+except (OSError, ValueError):
+    sys.exit(1)
+sys.exit(0 if "codegraph" in (data.get("mcpServers") or {}) else 1)
+PY
+CGWIRE
+)"
+
+# `codegraph install` takes --location=global or --location=local, and `local`
+# writes the MCP config plus a marker-fenced block into the *current project*.
+# modules/53-codegraph.sh pins `global` and runs from $HOME precisely so that a
+# project-local write has nowhere to land - this repo's CLAUDE.md is tracked and
+# public. A project-local write from $HOME would leave a .mcp.json behind, so
+# its absence is what says the pin held. Asserted here rather than by grepping
+# the repo's CLAUDE.md for "codegraph", which would also match the word being
+# used in prose - the failure mode CLAUDE.md warns about twice.
+check "codegraph wiring stayed global, not project-local" \
+      "[ ! -f $HOME/.mcp.json ]"
+
+# codegraph ships with telemetry ON and reports an event from `codegraph install`
+# itself, so modules/53-codegraph.sh opts out before it wires anything. Assert
+# the stored decision rather than that the command was called: `telemetry off`
+# writes "enabled": false with "consent_source": "cli", and only the file proves
+# it stuck. A machine that somehow re-enabled it fails here.
+check "codegraph telemetry is off" \
+      "$(cat <<'CGTELEM'
+      python3 - <<'PY'
+import json, os, sys
+try:
+    with open(os.path.expanduser("~/.codegraph/telemetry.json")) as fh:
+        data = json.load(fh)
+except (OSError, ValueError):
+    sys.exit(1)
+sys.exit(0 if data.get("enabled") is False else 1)
+PY
+CGTELEM
+)"
+
+# ------------------------------------------------------------------
 if $IS_MACOS; then
 section "macOS extras"
 check "homebrew"          "command -v brew"

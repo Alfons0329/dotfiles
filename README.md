@@ -4,7 +4,7 @@ One command turns a bare machine into my working environment. Same script on a
 headless Ubuntu build server and on a MacBook.
 
 ```sh
-git clone https://github.com/<user>/dotfiles ~/dotfiles
+git clone https://github.com/Alfons0329/dotfiles ~/dotfiles
 ~/dotfiles/install.sh
 ```
 
@@ -20,6 +20,79 @@ overwrite in `$HOME` is moved to `<file>.bak.<timestamp>` first.
 Headless servers need no flags: with no `DISPLAY`, `--minimal` turns itself on
 and the GUI modules are skipped.
 
+## A brand-new Mac, start to finish
+
+The quickstart assumes `git` exists. On a Mac out of the box it does not — see
+[Why the Command Line Tools come first](#why-the-command-line-tools-come-first)
+— so the clone is the step that fails, before the installer ever runs:
+
+```sh
+xcode-select --install        # GUI dialog. Wait for it to finish.
+git clone https://github.com/Alfons0329/dotfiles ~/dotfiles
+~/dotfiles/install.sh
+```
+
+Add `--theme kanagawa` or `--theme ayu-dark` to that last line if you don't want
+the default tokyonight; it sets Neovim and the terminal together, and it is
+read once at install time, so choosing here is cheaper than changing later.
+
+**It stops for your password twice**, and `--yes` will not prevent either:
+Homebrew's own installer asks, and so does the login-shell change (`chsh`).
+`--yes` only answers *this* script's prompts, which on macOS is just the
+optional Ghostty build. Everything else — Homebrew, the Brewfile packages, a
+pinned Neovim, the Node toolchain, language servers — is download-bound and
+wants roughly half an hour on a good connection.
+
+### Why the Command Line Tools come first
+
+`/usr/bin/git` on a fresh Mac is not git. It, `/usr/bin/clang` and
+`/usr/bin/make` are 78 hard links to a single 118 KB binary that identifies
+itself as `com.apple.dt.xcode_select.tool-shim-public` — a launcher that opens
+the Command Line Tools installer and exits. Confirm it on any Mac with
+`ls -li /usr/bin/git /usr/bin/clang`: same inode, same link count.
+
+The tools do arrive either way, because Homebrew's installer pulls them in and
+`git` is in `packages/brew.txt`. `/usr/bin/curl` is a genuine binary rather than
+a shim, so this bootstraps with no `xcode-select` step at all:
+
+```sh
+curl -fsSL https://github.com/Alfons0329/dotfiles/archive/refs/heads/master.tar.gz | tar xz
+```
+
+Installing the tools first is still the better route, for one reason: it gets
+you a **git checkout instead of an unpacked tarball**. Everything this repo puts
+in `$HOME` is a symlink back into the checkout, so `git pull` is how config
+updates reach a machine. A tarball has no remote to pull from.
+
+### HTTPS or SSH
+
+Either. HTTPS is the default above because it needs nothing set up first — the
+repo is public, so an anonymous clone works with no credential at all. SSH needs
+a keypair on the machine *and* its public half registered on GitHub, which on a
+laptop you unboxed this morning means generating a key and pasting it into a
+browser before you can clone.
+
+If you already carried your key across, prefer SSH — you want it for pushing
+regardless. Switching afterwards is one command:
+
+```sh
+git -C ~/dotfiles remote set-url origin git@github.com:Alfons0329/dotfiles.git
+```
+
+### Two things that are not bugs
+
+- **Language servers finish after the script does.** Treesitter parsers compile
+  lazily on first file open, so the first Python or TypeScript buffer you open
+  is unhighlighted for a moment. Forcing them up front was tried and took 27
+  minutes; [docs/INSTALL.md](docs/INSTALL.md) has the numbers.
+- **The bare-machine path is the untested part, not macOS generally.** The
+  modules themselves run on macOS routinely. What no run has exercised is a Mac
+  with *neither* Homebrew nor the Command Line Tools present, since every macOS
+  run so far started with both — so the first two steps above are the ones with
+  no track record. `modules/70-ghostty.sh` has never run at all; it asks first,
+  so declining costs nothing. `./install.sh --only <module>` re-runs one piece
+  if something looks wrong.
+
 ## Documentation
 
 The README is the starting point; each subsystem has its own page:
@@ -29,6 +102,8 @@ The README is the starting point; each subsystem has its own page:
 | **[docs/NEOVIM.md](docs/NEOVIM.md)** | Editor keys as a VSCode→Neovim map, and the tmux-safe subset (`gd`/`<C-o>`, `<M-1..9>`, `<C-n>` sidebar) |
 | **[docs/TERMINAL.md](docs/TERMINAL.md)** | Ghostty, iTerm2, tmux keys, fonts, locale, truecolor, themes |
 | **[docs/INSTALL.md](docs/INSTALL.md)** | Modules, package manifests, version pins, the test suite |
+| **[docs/herdr-tmux-analogy.md](docs/herdr-tmux-analogy.md)** | herdr's model for a tmux user: workspace/tab/pane, agent state, and an ordinary day's workflow |
+| **[docs/herdr-shortcut.md](docs/herdr-shortcut.md)** | herdr keys as a diff against oh-my-tmux — the seven that differ, and why the prefix can look dead |
 | **[docs/herdr-loop-eng-tutorial.md](docs/herdr-loop-eng-tutorial.md)** | Running a staged, one-session-per-stage agent workflow on herdr instead of tmux windows |
 
 ## Options
@@ -65,6 +140,7 @@ Modules run in this order, and each is also a standalone script:
 | `claude` | Claude Code, ccstatusline, completion notifications |
 | `claude-output-styles` | Claude Code output styles (`~/.claude/output-styles`) |
 | `herdr` | herdr, an agent-aware multiplexer installed alongside tmux, not instead of it |
+| `codegraph` | codegraph, wired into Claude Code as a global MCP server |
 | `desktop` | macOS only: terminal, fonts, system monitor, iTerm2 profile |
 | `ghostty` | macOS only: opt-in patched Ghostty build — asks first |
 
@@ -122,7 +198,16 @@ pane is working, blocked or done and shows that in a sidebar — the thing tmux
 cannot tell you when four agents are running at once. It is installed
 *alongside* tmux and changes nothing about it; you opt in by typing `herdr`.
 [docs/herdr-loop-eng-tutorial.md](docs/herdr-loop-eng-tutorial.md) covers
-running a staged workflow on it.
+running a staged workflow on it, and
+[docs/herdr-shortcut.md](docs/herdr-shortcut.md) the keys.
+
+And [codegraph](https://github.com/colbymchenry/codegraph), a pre-indexed code
+graph wired into Claude Code as a global MCP server, so an agent can ask for a
+symbol's callers or a change's blast radius in one call instead of grepping its
+way there. The installer only wires the agent up; building a repo's index is
+`codegraph init` inside it, which stays manual. codegraph ships with anonymous
+telemetry on — `modules/53-codegraph.sh` turns it off before wiring anything,
+because `codegraph install` reports an event of its own.
 
 ## Key bindings — the daily five
 
@@ -210,9 +295,33 @@ Two caveats worth knowing:
 
 ## After installing
 
-1. `exec zsh`
-2. `nvim`, then `:Copilot auth` — one-time GitHub login
-3. `claude` — one-time Claude Code login
+Four of these need a browser and cannot be scripted; that is the whole reason
+they are a list rather than another module.
+
+1. `exec zsh` — or just open a new tab. The login shell already changed.
+2. `nvim`, then `:Copilot auth` — one-time GitHub login.
+3. `claude` — one-time Claude Code login.
+4. `gh auth login` — only if you use `gh`; the installer places the binary and
+   stops there.
+5. Put your tokens and employer-specific paths in `~/.zshrc.local`, which was
+   seeded empty and is gitignored. Not in `~/.zshrc` — that one is public, and
+   `test/verify.sh` fails the build if a credential appears in it.
+6. `./test/verify.sh` — asserts the install actually behaves, rather than that
+   files exist. Run it before you trust the machine.
+
+Then, per repo you work in:
+
+```sh
+cd ~/some/repo && codegraph init   # build that repo's graph; the installer
+                                   # only wires the MCP server, not the index
+```
+
+herdr needs nothing: type `herdr` to enter it. Its config was seeded once to
+`~/.config/herdr/config.toml` and is **never overwritten** by a later
+`install.sh`, so edits there survive — and, for the same reason, a template
+change in this repo will not reach a machine that already has the file. Keys are
+[docs/herdr-shortcut.md](docs/herdr-shortcut.md); the mental model, if you are
+coming from tmux, is [docs/herdr-tmux-analogy.md](docs/herdr-tmux-analogy.md).
 
 ## Credits
 

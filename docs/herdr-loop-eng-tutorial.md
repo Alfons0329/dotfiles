@@ -14,6 +14,11 @@ a pane, wait on a state, or open a new one.
 
 `modules/52-herdr.sh` installs it. See [INSTALL.md](INSTALL.md).
 
+This page assumes the model and the keys. For the model — workspace vs tab vs
+the three meanings of "session" — see
+[herdr-tmux-analogy.md](herdr-tmux-analogy.md); for the keys,
+[herdr-shortcut.md](herdr-shortcut.md).
+
 ## What this does not change
 
 Read this section before the rest of it, because the point of the exercise is
@@ -27,8 +32,10 @@ that almost nothing changes.
 - **The workflow's own files are not modified.** Nothing here asks the skill,
   the prompts, or the artifacts to know that herdr exists.
 - **The prefix is still `Ctrl+B`** — herdr's default, and tmux's default on
-  this machine (`.tmux.conf.local` leaves gpakosz's `C-a` swap commented out).
-  Splits and tabs answer to the same muscle memory in both.
+  this machine (`.tmux.conf.local` leaves gpakosz's `C-a` swap commented out),
+  so you never have to remember which one you are attached to. Seven of the
+  *second* keys do differ from oh-my-tmux; that list is in
+  [herdr-shortcut.md](herdr-shortcut.md).
 - **The artifacts are still the interface.** Everything a stage needs to hand
   to the next stage is a file under `~/progress/<ticket-id>/` that got
   committed. herdr does not add a second channel, and this document argues that
@@ -49,18 +56,14 @@ stage of the loop, `claude` running in each.
 | pane running `claude` | **pane** | a terminal — plus an agent state |
 | — | **session** | a whole runtime namespace, above workspaces |
 
-The one word that changes meaning is **session**, and it changes twice over, so
-it is worth being pedantic once:
-
-- A **herdr session** is a server namespace with its own socket — one level
-  *above* workspaces, not below. You almost never need a second one. Selected
-  with `herdr --session <name>` or `$HERDR_SESSION`.
-- A **Claude Code session** is a conversation. This is the one the workflow's
-  "one stage, one fresh session" rule is about, and it maps to a **pane**, not
-  to a herdr session.
-- A **tmux session** is the old per-epic container, which is now a workspace.
-
 So: *epic → workspace, stage → tab, conversation → pane.*
+
+"Session" means three different things across this stack, and getting them
+confused is the one thing that will make the rest of this page read wrong. The
+short version: this workflow's "one stage, one fresh **session**" rule is about
+a *Claude Code* session — a conversation — which maps to a **pane**, not to a
+herdr session. [herdr-tmux-analogy.md](herdr-tmux-analogy.md) disambiguates all
+three properly.
 
 ## Day one
 
@@ -71,14 +74,19 @@ claude                   # in a pane; herdr detects it and starts reporting stat
 
 | Key | Action |
 | --- | --- |
-| `prefix v` | split right |
-| `prefix -` | split down |
-| `prefix c` | new tab |
-| `prefix n` / `prefix p` | next / previous tab |
-| `prefix q` | detach — **agents keep running** |
-| `prefix ?` | the full binding list |
+| `<prefix> N` | new workspace — one per epic |
+| `<prefix> c` | new tab — one per ticket or stage |
+| `<prefix> v` / `<prefix> -` | split right / below |
+| `<prefix> p` / `<prefix> n` | previous / next tab |
+| `<prefix> b` | toggle the sidebar |
+| `<prefix> q` | detach — **agents keep running** |
+| `<prefix> ?` | the full binding list |
 
-`prefix q` is the one to internalise. The server owns the panes; the client is
+Those are herdr's stock bindings, and this repo does not remap any of them —
+[herdr-shortcut.md](herdr-shortcut.md) explains why, and lists the seven that
+differ from oh-my-tmux.
+
+`<prefix> q` is the one to internalise. The server owns the panes; the client is
 just a view onto it. Detaching, closing the terminal, or shutting the laptop
 lid leaves every agent running, and `herdr` reattaches to exactly what you
 left. That is the same promise tmux makes, with one addition: with
@@ -99,62 +107,45 @@ Suppose an epic with four tickets, artifacts already laid out the usual way:
 └── yt-14/
 ```
 
-Interactively that is `prefix c` four times. From a script — worth having,
-because the layout is identical every epic:
+Build that by hand. It is a handful of keystrokes, and the same shape every
+epic:
 
-```sh
-#!/usr/bin/env sh
-# ~/.local/bin/epic-open  <epic-dir>  <ticket-id>...
-epic="$1"; shift
-ws=$(herdr workspace create --label "$(basename "$epic")" --cwd "$epic" \
-     | python3 -c 'import json,sys;print(json.load(sys.stdin)["result"]["workspace"]["workspace_id"])')
+1. `<prefix> N` — new workspace, named for the epic (`epic-1-upload`).
+2. `<prefix> c` once per ticket, renaming each with `<prefix> T` (`yt-11`,
+   `yt-12`, …). In tmux terms you have just made a session with four windows.
+3. In each tab, `<prefix> v` to split right, then `cd` to the ticket's directory
+   and start `claude` on the left.
 
-for ticket in "$@"; do
-    herdr tab create --workspace "$ws" --label "$ticket" --cwd "$epic/$ticket" --no-focus >/dev/null
-done
-herdr workspace focus "$ws"
-```
+That last split is the layout worth making a habit: **agent on the left, plain
+shell on the right** for `git log`, `tail`, and the test run you want to watch
+without typing into the agent's pane and interrupting it.
 
-```sh
-epic-open ~/progress/epic-1-upload yt-11 yt-12 yt-13 yt-14
-```
+Naming the tabs is not cosmetic. `<prefix> g` jumps to a tab by name, and the
+sidebar labels agent states by tab, so an unnamed tab shows up as a state you
+cannot attribute to a ticket.
 
-Every subcommand prints JSON on stdout, so IDs (`w1`, `w1:t2`, `w1:p3`) are
-easy to thread from one call to the next. `herdr workspace list`,
-`herdr tab list`, `herdr pane list` enumerate what exists.
-
-Two panes per stage tab is a good default: the agent on the left, a plain shell
-on the right for `git log`, `tail`, and the test run you want to watch without
-interrupting the agent.
-
-```sh
-herdr pane split w1:p1 --direction right --ratio 0.35 --cwd ~/code/target-repo
-```
+If you would rather not repeat that by hand every epic, it scripts cleanly —
+see [the appendix](#appendix-scripting-a-repeated-layout). Reach for it once the
+same four-ticket layout is the third thing you have typed this week, not before.
 
 ## The part that actually pays for itself
 
 With four tickets in flight, the question you ask thirty times a day is *which
 of these is waiting on me?* In tmux the answer requires visiting every window.
-Here:
 
-```sh
-herdr agent list
-```
-
-…and the sidebar answers it continuously without attaching at all: `blocked`
-means an agent is sitting on a permission prompt or a question, `working` means
-it is running, `done` means it finished and you have not looked yet.
+Here it is already on screen. `<prefix> b` toggles the sidebar, which rolls up
+every agent's state across every workspace whether or not you are attached to
+the pane: `blocked` means it is sitting on a permission prompt or a question,
+`working` means it is running, `done` means it finished and you have not looked
+yet. (`herdr agent list` prints the same thing, if you want it in a shell.)
 
 That distinction between `blocked` and `working` is the whole reason to bother.
 A stage that stopped ten minutes ago on "may I run this command?" is
 indistinguishable, in tmux, from one that is still thinking.
 
-Block until something needs you, rather than polling:
-
-```sh
-herdr agent wait w1:t2 --until blocked --until done --timeout 900000
-herdr notification show "yt-12 impl" --body "needs you" --sound request
-```
+So the loop for the day is: glance at the sidebar, go to whatever is `blocked`
+with `<prefix> g`, unblock it, come back. No polling, and no cycling through
+tabs to find out nothing has changed.
 
 ## The boundary you must not cross
 
@@ -213,11 +204,9 @@ right.
 The mechanical version of rule 1: when a stage reports and stops, close its
 pane. Do not reuse it.
 
-```sh
-herdr pane close w1:p3      # spec is done; its conversation ends here
-```
+`<prefix> x` closes the focused pane — spec is done, its conversation ends here.
 
-Then split a new pane for `impl` and start a new `claude` in it. The
+Then `<prefix> v` for a new pane and start a new `claude` in it. The
 conversation boundary and the pane boundary should be the same boundary — that
 way "is this a fresh session?" is answerable by looking, instead of by
 remembering.
@@ -230,14 +219,16 @@ recovery from a crash, not a stage transition.
 
 Several tickets from one epic being worked at once means several branches of
 one repo being worked at once, and one working tree cannot hold them. herdr
-wraps `git worktree`:
+wraps `git worktree`: `<prefix> G` prompts for a branch and opens a workspace on
+a fresh checkout of it. The same thing non-interactively, when you are setting up
+several at once:
 
 ```sh
 herdr worktree create --cwd ~/code/target-repo --branch yt-12-upload-retry --base main --label yt-12
 herdr worktree list --cwd ~/code/target-repo
 ```
 
-That opens a workspace on its own checkout, so `impl` on `yt-12` and `verify`
+Either way you get a workspace on its own checkout, so `impl` on `yt-12` and `verify`
 on `yt-11` stop stepping on each other's working tree. It also keeps every
 stage of one ticket on one branch, which is what `pr-create` expects to find.
 
@@ -286,8 +277,55 @@ built-ins.
 herdr server reload-config    # apply edits without restarting the server
 ```
 
+## Appendix: scripting a repeated layout
+
+Optional, and deliberately last. Everything above is done from the keyboard, and
+that is the right default — you see what you are making. But the epic layout is
+identical every time, and once you have typed it three times in a week it is
+worth having as a command.
+
+Every herdr subcommand prints JSON on stdout, so IDs (`w1`, `w1:t2`, `w1:p3`)
+thread from one call to the next. `herdr workspace list`, `herdr tab list` and
+`herdr pane list` enumerate what exists.
+
+```sh
+#!/usr/bin/env sh
+# ~/.local/bin/epic-open  <epic-dir>  <ticket-id>...
+epic="$1"; shift
+ws=$(herdr workspace create --label "$(basename "$epic")" --cwd "$epic" \
+     | python3 -c 'import json,sys;print(json.load(sys.stdin)["result"]["workspace"]["workspace_id"])')
+
+for ticket in "$@"; do
+    herdr tab create --workspace "$ws" --label "$ticket" --cwd "$epic/$ticket" --no-focus >/dev/null
+done
+herdr workspace focus "$ws"
+```
+
+```sh
+epic-open ~/progress/epic-1-upload yt-11 yt-12 yt-13 yt-14
+```
+
+Note what it does **not** do: it opens panes and stops. It does not start
+`claude` in them, and it does not prompt anything. That keeps it on the safe
+side of the boundary above — it is staging, not firing.
+
+The other thing worth scripting is waiting, when you are stepping away rather
+than watching the sidebar:
+
+```sh
+herdr agent wait w1:t2 --until blocked --until done --timeout 900000
+herdr notification show "yt-12 impl" --body "needs you" --sound request
+```
+
+That blocks until something needs you and then tells you. It still does not act
+on the answer — you do.
+
 ## See also
 
+- [herdr-tmux-analogy.md](herdr-tmux-analogy.md) — the model, and an ordinary
+  day's workflow rather than an epic's
+- [herdr-shortcut.md](herdr-shortcut.md) — the keys, and the three ways the
+  prefix can look dead when it isn't
 - [INSTALL.md](INSTALL.md) — the module, the manifests, the test suite
 - [TERMINAL.md](TERMINAL.md) — tmux keys, truecolor, fonts, themes
 - [herdr.dev/docs](https://herdr.dev/docs/) — upstream; the CLI reference and
