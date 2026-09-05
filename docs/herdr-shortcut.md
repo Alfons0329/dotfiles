@@ -101,16 +101,23 @@ before assuming the prefix is broken.
 Three separate causes, all of which present identically: you press `<C-b>`, then
 a key, and nothing happens. Diagnose in this order.
 
-**1. A non-ASCII input source is eating the second key.** With the zhTW IME
-active, `<C-b>` registers but the key *after* it never reaches herdr. This repo's
-[config.toml.example](../home/.config/herdr/config.toml.example) sets
-`switch_ascii_input_source_in_prefix = true`, which switches the host input
-source to an ASCII layout only while prefix mode is open and restores it on exit.
+**1. A non-ASCII input source is eating the second key.** With a Bopomofo (zhTW)
+source active, `<C-b>` registers but the key *after* it never reaches herdr —
+`<prefix> v` types `ㄒ` into the pane, which reads as a dead prefix if you do not
+recognise the character.
 
-Two traps in that fix. It belongs under `[experimental]`, **not** `[keys]` —
-under `[keys]` it parses fine and is silently ignored. And it is experimental, so
-it may be renamed upstream; `herdr server reload-config` reports that in its
-`diagnostics` array. If it ever disappears, switch input source by hand.
+**Switch input source to English.** That is the whole fix, and it is the reason
+this repo ships no config for it.
+
+herdr does document an `[experimental]` setting,
+`switch_ascii_input_source_in_prefix`, which is supposed to select an
+ASCII-capable layout for the duration of prefix mode. It was tried here on herdr
+0.8.2 / macOS 25.5 and **did not work**: `herdr server reload-config` returned
+`{"diagnostics":[],"status":"applied"}` and `<prefix> v` still produced `ㄒ`. The
+cause was not pinned down — plausibly the hook is installed at server start
+rather than on a config reload, or the Bopomofo source has no ASCII-capable
+sibling to switch to. It was removed rather than left in place looking
+load-bearing. The lesson generalises: *"config applied" is not "hook working."*
 
 **2. Caps Lock is not an English toggle.** Using Caps Lock to escape the IME
 makes this worse, not better: it sends `V`, not `v`, and herdr binds

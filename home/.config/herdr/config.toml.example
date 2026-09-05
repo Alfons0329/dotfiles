@@ -36,21 +36,28 @@ prefix = "ctrl+b"
 # box would keep its old keys and `prefix ?` would be wrong on all of them.
 # Learn the seven differences instead; docs/herdr-shortcut.md is that list.
 
-[experimental]
-# With a non-ASCII input source active (zhTW here), the key *after* the prefix
-# never reaches herdr, so `prefix v` is indistinguishable from a dead prefix.
-# This switches the host input source to an ASCII layout only while prefix mode
-# is open, then restores it.
+# No [experimental] section either, and specifically NOT
+# switch_ascii_input_source_in_prefix - which is worth recording, because the
+# problem it claims to solve is real and someone will find that setting and try
+# it again.
 #
-# Reaching for Caps Lock instead is the trap: it sends `V`, and herdr binds
-# prefix+shift+<key> to *different* actions (prefix+shift+n is new_workspace),
-# so an uppercase key matches no binding at all and still does nothing.
+# The problem: with a Bopomofo (zhTW) input source active, the key *after* the
+# prefix never reaches herdr. `prefix v` types "ㄒ" into the pane, which is
+# indistinguishable from a dead prefix if you do not recognise it.
 #
-# Two things worth knowing. The key belongs under [experimental], NOT [keys],
-# where it parses fine and is silently ignored. And being experimental it may
-# be renamed upstream - `herdr server reload-config` reports that in its
-# `diagnostics` array, and the fallback is to switch input source by hand.
-switch_ascii_input_source_in_prefix = true
+# The setting is documented to switch the host input source to an ASCII layout
+# while prefix mode is open. Tried on herdr 0.8.2 on macOS 25.5:
+# `herdr server reload-config` reported {"diagnostics":[],"status":"applied"}
+# and `prefix v` still produced "ㄒ". Whether that is because the hook is only
+# installed at server start rather than on a config reload, or because the
+# Bopomofo source has no ASCII-capable sibling for macOS to switch to, was not
+# established - the setting was dropped rather than left in place looking load
+# bearing. "Config applied" is not "hook working".
+#
+# The fix that does work is to switch input source to English. NOT with Caps
+# Lock, which sends `V` - and herdr binds prefix+shift+<key> to *different*
+# actions (prefix+shift+n is new_workspace), so an uppercase key matches no
+# binding at all and fails the same silent way.
 
 [theme]
 # Rewritten by modules/52-herdr.sh from --theme at seed time. herdr ships
