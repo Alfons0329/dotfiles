@@ -9,6 +9,9 @@
 #             nothing this file is responsible for is pre-provisioned.
 #   gh      - 22.04's apt gh is the universe archive's old snapshot;
 #             modules/40-tools.sh adds GitHub's own apt repo instead.
+#   herdr,  - no apt package exists for either; both come from their vendor
+#   codegraph installers in modules/52-herdr.sh and modules/53-codegraph.sh,
+#             which is also the only path available on macOS for codegraph.
 
 # shell + terminal
 zsh
