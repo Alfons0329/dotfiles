@@ -13,8 +13,14 @@ For what workspaces and tabs actually *are*, see
 comparison, [TERMINAL.md](TERMINAL.md). For the staged agent workflow,
 [herdr-loop-eng-tutorial.md](herdr-loop-eng-tutorial.md).
 
-Every key here was read out of `herdr --default-config` on herdr 0.8.2. There is
-no `[keys]` block in this repo's config beyond `prefix` — see
+Every key here was read out of `herdr --default-config` on herdr 0.8.2, and the
+six you will use hourly — `v`, `-`, `q`, `w`, `b`, `?` — were pressed by hand on
+macOS 25.5 to confirm they fire. That distinction matters on this page: an
+earlier revision documented an IME fix that herdr reported as applied and which
+did nothing, so "read from the config" and "verified working" are not the same
+claim. See [When the prefix looks dead](#when-the-prefix-looks-dead).
+
+There is no `[keys]` block in this repo's config beyond `prefix` — see
 [Why nothing is remapped](#why-nothing-is-remapped).
 
 ## The seven that differ
