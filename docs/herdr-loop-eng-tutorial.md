@@ -79,12 +79,18 @@ claude                   # in a pane; herdr detects it and starts reporting stat
 | `<prefix> v` / `<prefix> -` | split right / below |
 | `<prefix> p` / `<prefix> n` | previous / next tab |
 | `<prefix> b` | toggle the sidebar |
+| `<prefix> J` / `<prefix> K` | next / previous **agent**, across workspaces |
 | `<prefix> q` | detach — **agents keep running** |
 | `<prefix> ?` | the full binding list |
 
-Those are herdr's stock bindings, and this repo does not remap any of them —
+Those are herdr's stock bindings and this repo does not remap any of them —
 [herdr-shortcut.md](herdr-shortcut.md) explains why, and lists the seven that
 differ from oh-my-tmux.
+
+The exception is the agent row. herdr ships `previous_agent` and `next_agent`
+with no key at all, so those two are bound by this repo's config rather than
+overridden — the same page covers where they come from and how to add them to a
+machine seeded before they existed.
 
 `<prefix> q` is the one to internalise. The server owns the panes; the client is
 just a view onto it. Detaching, closing the terminal, or shutting the laptop
@@ -143,9 +149,15 @@ That distinction between `blocked` and `working` is the whole reason to bother.
 A stage that stopped ten minutes ago on "may I run this command?" is
 indistinguishable, in tmux, from one that is still thinking.
 
-So the loop for the day is: glance at the sidebar, go to whatever is `blocked`
-with `<prefix> g`, unblock it, come back. No polling, and no cycling through
-tabs to find out nothing has changed.
+So the loop for the day is: glance at the sidebar, go to whatever is `blocked`,
+unblock it, come back. No polling, and no cycling through tabs to find out
+nothing has changed.
+
+`<prefix> J` / `<prefix> K` walk the agent list itself, crossing workspace
+boundaries, so with four tickets in flight they are usually the fastest way back
+to the one that stopped. `<prefix> g` still wins when you know the name and it is
+somewhere else entirely; `<prefix> <A-1>…<A-9>` goes straight to agent N in the
+sidebar's order.
 
 ## The boundary you must not cross
 
