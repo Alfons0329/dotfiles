@@ -5,8 +5,10 @@ you never have to remember which multiplexer you are attached to. Below,
 `<prefix>` means press-and-release `Ctrl+B`, then the next key.
 
 Because the prefix matches, the only thing worth learning is the **diff**: what
-the second key does differently. That turns out to be seven bindings. This page
-is the list, plus the three ways the prefix can appear dead when it isn't.
+the second key does differently. That turns out to be seven bindings, plus three
+keys for [moving between agents](#moving-between-agents) that herdr ships unbound
+and this repo binds. This page is those lists, plus the three ways the prefix can
+appear dead when it isn't.
 
 For what workspaces and tabs actually *are*, see
 [herdr-tmux-analogy.md](herdr-tmux-analogy.md). For the tmux side of the
@@ -20,8 +22,14 @@ earlier revision documented an IME fix that herdr reported as applied and which
 did nothing, so "read from the config" and "verified working" are not the same
 claim. See [When the prefix looks dead](#when-the-prefix-looks-dead).
 
-There is no `[keys]` block in this repo's config beyond `prefix` — see
-[Why nothing is remapped](#why-nothing-is-remapped).
+The three agent keys are newer and sit between those two states: `herdr config
+check` parses and accepts them and `herdr server reload-config` applies them with
+no diagnostics, which is more than the IME setting ever managed — that one is a
+behaviour hook, these are bindings the parser demonstrably validates — but they
+have not yet been pressed on a live session.
+
+This repo's config sets `prefix` and those three agent bindings, and nothing
+else — see [Why nothing is remapped](#why-nothing-is-remapped).
 
 ## The seven that differ
 
@@ -63,10 +71,75 @@ Nothing to learn here; they are listed so you know not to look them up.
 | `<prefix> 1…9` | jump straight to tab N |
 | `<prefix> ?` | list every binding — the escape hatch |
 
+## Moving between agents
+
+The reason to run herdr at all is that it knows which agent is `working`,
+`blocked`, `done` or `idle` across every workspace at once. Out of the box you
+cannot *act* on that: the sidebar tells you an agent went `blocked`, and then
+leaves you to walk to it by hand through the workspace picker.
+
+That gap is not a mistake in this setup — herdr ships the three agent actions
+**unbound**, and `prefix ?` lists them under `agent` as `unset previous agent`,
+`unset next agent`, `unset focus agent 1-9`. Which reads like "herdr does not do
+this" rather than "you have not said where to put it."
+
+This repo binds them:
+
+| Keys | What it does |
+| --- | --- |
+| `<prefix> K` | previous agent |
+| `<prefix> J` | next agent |
+| `<prefix> <A-1>` … `<A-9>` | jump straight to agent N, in sidebar order |
+
+`J` / `K` because `h j k l` already means "move focus" here, so shift is the same
+motion one level out: panes are the inner axis, agents the outer one. What they
+walk is the agent list the sidebar shows, not the current workspace's tabs, so
+they cross workspace boundaries — which no tab or pane key can do, and which is
+the whole point.
+
+The numeric jump takes Alt because `<prefix> 1…9` is already tab switching, and
+Alt is the modifier herdr's own config suggests for it. Alt reaches herdr as
+`Esc+` in both terminals this repo configures: Ghostty via `macos-option-as-alt`,
+iTerm2 via the Option-sends-Esc+ setting in the dynamic profile that
+`modules/60-desktop.sh` deploys. In some third terminal where Option types `¡™£`,
+that row is the one that will not fire; `J` / `K` still will.
+
+### Getting these onto a machine that predates them
+
+`modules/52-herdr.sh` seeds `~/.config/herdr/config.toml` once and never
+overwrites it, so an existing machine keeps the config it already has and these
+keys stay unset there. Paste this into its `[keys]` block:
+
+```toml
+previous_agent = "prefix+shift+k"
+next_agent = "prefix+shift+j"
+focus_agent = "prefix+alt+1..9"
+```
+
+Then, without restarting anything:
+
+```sh
+herdr config check          # config: ok
+herdr server reload-config  # {"diagnostics":[],"status":"applied"}
+```
+
+`herdr config check` is worth running rather than trusting, because it reads the
+key syntax and not just the TOML: `"prefix+quux+1..9"` comes back as
+`invalid keybinding …; disabling binding`, and a `focus_agent` that is not
+indexed as `indexed keybinding must use 1..9`.
+
+What it will **not** catch is a collision. `next_agent = "prefix+n"` reports
+`config: ok` even though `prefix+n` is already `next_tab`, and one of the two
+then silently loses. So if you pick different keys, diff them against
+`herdr --default-config` yourself — `test/verify.sh` does exactly that for the
+three above, so a future herdr release claiming one of them fails the build
+instead of quietly taking the binding away.
+
 ## herdr-only, with no tmux ancestor
 
 These are the ones worth actually practising, because no habit will produce
-them. They are also most of the reason to run herdr at all.
+them. The agent keys above belong to this group too and are listed separately
+only because they are the ones you have to bind yourself.
 
 | Keys | What it does |
 | --- | --- |
@@ -126,10 +199,13 @@ sibling to switch to. It was removed rather than left in place looking
 load-bearing. The lesson generalises: *"config applied" is not "hook working."*
 
 **2. Caps Lock is not an English toggle.** Using Caps Lock to escape the IME
-makes this worse, not better: it sends `V`, not `v`, and herdr binds
-`prefix+shift+<key>` to *different* actions — `<prefix> N` is new-workspace,
-`<prefix> X` is close-tab. So an uppercase key matches no binding at all and does
-nothing, exactly like a dead prefix. Switch input source properly instead.
+makes this worse, not better: it sends `V`, not `v`, and herdr reads
+`prefix+shift+<key>` as a *different* action — `<prefix> N` is new-workspace,
+`<prefix> X` is close-tab. So `<prefix> v` with Caps Lock on either matches
+nothing and looks exactly like a dead prefix, or matches something you did not
+ask for. Since this repo binds `<prefix> J` / `<prefix> K`, a Caps-Locked
+`<prefix> j` now walks you to another agent rather than moving pane focus, which
+is the more confusing of the two outcomes. Switch input source properly instead.
 
 **3. Something outside herdr is eating `<C-b>` first.** A herdr client running
 inside a tmux pane is the usual cause — the outer multiplexer takes the prefix.
@@ -153,9 +229,15 @@ it pre-emptively — the shared prefix is worth more than the nested case costs.
 
 ## Why nothing is remapped
 
-herdr's keys are fully rebindable, and an earlier version of this setup remapped
-five of them to match oh-my-tmux. That was reverted, for a reason that is
-specific to how this repo installs herdr.
+"Remapped" is the operative word: the agent keys above are not a remap, and the
+argument below does not apply to them. herdr ships those three actions with no
+key at all, so binding them overrides nothing, and `prefix ?` stays truthful on
+every machine because it renders the live config rather than a built-in table. A
+machine without the block simply has no agent keys — not different ones.
+
+Everything else is a different story. herdr's keys are fully rebindable, and an
+earlier version of this setup remapped five of them to match oh-my-tmux. That was
+reverted, for a reason that is specific to how this repo installs herdr.
 
 `modules/52-herdr.sh` seeds `~/.config/herdr/config.toml` **once and never
 overwrites it**. A keymap added to the tracked template therefore reaches a

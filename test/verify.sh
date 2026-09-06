@@ -420,6 +420,37 @@ check "herdr Claude Code integration installed" \
 check "herdr config is a real file, not a symlink into the repo" \
       "[ ! -L $HOME/.config/herdr/config.toml ]"
 
+# The seeded config is what a fresh machine boots with, so hand it to herdr's
+# own parser instead of eyeballing the TOML. `config check` reads key syntax,
+# not just TOML: a deliberately broken "prefix+quux+1..9" comes back as
+# `invalid keybinding ...; disabling binding` and exits 1, which is what makes
+# this worth a check at all. It reads $HOME/.config/herdr/config.toml - in this
+# container, the seeded copy of config.toml.example.
+check "herdr accepts the seeded config, keybindings included" \
+      "$HERDR_BIN config check"
+
+# The three agent-navigation actions ship UNBOUND upstream, so they are the one
+# part of the template that can vanish without herdr objecting: `config check`
+# is perfectly happy with a config that has no agent keys at all. Anchor on the
+# assignment lines - the same file explains the choice in a comment containing
+# `previous_agent = ""`, so an unanchored grep would pass on the comment
+# describing the very default the block exists to replace.
+check "herdr agent navigation keys are bound" \
+      "$(cat <<'HERDRAGENT'
+      [ "$(grep -cE '^(previous_agent|next_agent|focus_agent) = "prefix' \
+            "$HOME/.config/herdr/config.toml")" = 3 ]
+HERDRAGENT
+)"
+
+# Collision guard, because nothing else will do it: herdr does NOT detect two
+# actions on one key. `next_agent = "prefix+n"` validates as `config: ok` while
+# prefix+n is already next_tab, and one of the two silently loses. The keys
+# chosen for agent navigation are unbound in 0.8.2; if a later release claims
+# prefix+shift+j/k or prefix+alt+1..9 as a default, this goes red instead of
+# the binding quietly stopping working.
+check "herdr agent keys do not collide with a herdr default" \
+      "! $HERDR_BIN --default-config | grep -qE '^# [a-z_]+ = \"prefix\\+(shift\\+[jk]|alt\\+1\\.\\.9)\"'"
+
 # The behavioural one. `command -v herdr` would pass on a binary that cannot
 # run at all - which is the likelier failure here than a missing file, since
 # this is a prebuilt Rust binary landing on whatever glibc the machine has.

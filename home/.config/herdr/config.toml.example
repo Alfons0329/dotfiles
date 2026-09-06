@@ -28,13 +28,49 @@
 # Change this line if you actually do that; don't change it pre-emptively.
 prefix = "ctrl+b"
 
-# Deliberately no other [keys] entries. herdr's defaults and oh-my-tmux's
-# bindings already agree on `-`, h/j/k/l, c, x, z, 1..9 and ?; the rest differ
-# (split right is `v` not `_`, detach is `q` not `d`, tabs are p/n not C-h/C-l)
-# and were left alone on purpose. Seeding a remap here would only reach a *new*
+# Deliberately no REMAPS below. herdr's defaults and oh-my-tmux's bindings
+# already agree on `-`, h/j/k/l, c, x, z, 1..9 and ?; the rest differ (split
+# right is `v` not `_`, detach is `q` not `d`, tabs are p/n not C-h/C-l) and
+# were left alone on purpose. Seeding a remap here would only reach a *new*
 # machine - this file is copied once and never overwritten - so every existing
 # box would keep its old keys and `prefix ?` would be wrong on all of them.
 # Learn the seven differences instead; docs/herdr-shortcut.md is that list.
+#
+# Agent navigation is the exception, and it is not a remap: herdr ships these
+# three actions UNBOUND. `herdr --default-config` prints them as
+# `previous_agent = ""`, and `prefix ?` lists them under "agent" as "unset".
+# Nothing upstream is being overridden, so the seed-once argument above does
+# not apply - there is no stock key that an unpatched machine would keep, and
+# `prefix ?` stays truthful everywhere because it renders the live config
+# rather than a built-in table. An older machine simply has no agent keys
+# until this block is pasted into its ~/.config/herdr/config.toml by hand.
+#
+# They matter because this is the one axis tmux has no equivalent for, and the
+# reason herdr is installed at all: agents live across workspaces, so "go to
+# the next agent" is not a tab move or a pane move and is unreachable with the
+# keys that already work. Without these, finding the agent that just went
+# `blocked` means reading the sidebar and then walking to its workspace by hand.
+#
+# shift+j / shift+k rather than an alt chord: h/j/k/l already means "move
+# focus" here, so shift+j/k reads as the same motion one level up, and herdr's
+# own key docs call ctrl/shift chords the reliable ones while "alt+... may
+# depend on your terminal/tmux setup". The indexed jump has to take alt
+# regardless, because prefix+1..9 is already switch_tab - so the two keys used
+# hourly sit on the reliable modifier and only the numeric one carries that
+# risk. alt arrives as Esc+ in both terminals this repo configures
+# (macos-option-as-alt in the Ghostty config, Option-sends-Esc+ in the iTerm2
+# dynamic profile from modules/60-desktop.sh).
+#
+# Check any edit to these three with `herdr config check`, which really does
+# parse the key syntax rather than only the TOML: "prefix+quux+1..9" comes back
+# as `invalid keybinding ...; disabling binding`, and a non-indexed value for
+# focus_agent as `indexed keybinding must use 1..9`. What it does NOT check is
+# collisions - `next_agent = "prefix+n"` reports `config: ok` even though
+# prefix+n is already next_tab. That check is yours to do against `herdr
+# --default-config`; the validator will not do it for you.
+previous_agent = "prefix+shift+k"
+next_agent = "prefix+shift+j"
+focus_agent = "prefix+alt+1..9"
 
 # No [experimental] section either, and specifically NOT
 # switch_ascii_input_source_in_prefix - which is worth recording, because the

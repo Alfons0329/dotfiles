@@ -115,8 +115,15 @@ That agent-plus-shell split is the one layout worth making a habit —
 into its pane and interrupting it.
 
 Then the loop for the rest of the day is: glance at the sidebar, go to whatever
-is `blocked`, unblock it, come back. `<prefix> g` jumps by name, which beats
-cycling with `<prefix> p` / `<prefix> n` once there is more than one workspace.
+is `blocked`, unblock it, come back. `<prefix> J` / `<prefix> K` step through the
+agents themselves and cross workspace boundaries doing it, which is the move tmux
+has no equivalent for; `<prefix> g` jumps by name when you know it. Either beats
+cycling with `<prefix> p` / `<prefix> n` once there is more than one workspace,
+since those only walk the tabs of the workspace you are already in.
+
+Those two agent keys are bound by this repo, not by herdr —
+[herdr-shortcut.md](herdr-shortcut.md#moving-between-agents) has the block and
+the reasoning.
 
 `<prefix> q` detaches and **agents keep running** — the server owns the panes and
 the client is only a view. Closing the terminal or shutting the lid is safe, and
