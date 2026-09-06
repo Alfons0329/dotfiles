@@ -209,6 +209,47 @@ check "nvim >= 0.11"          '[ "$(nvim --version | head -1 | sed "s/^NVIM v[0-
 check "config dir symlinked"  "[ -L $HOME/.config/nvim ]"
 check "init.lua present"      "[ -f $HOME/.config/nvim/init.lua ]"
 check "lazy.nvim bootstrapped" "[ -d $HOME/.local/share/nvim/lazy/lazy.nvim ]"
+
+# home/.config/nvim/lazy-lock.json is tracked and modules/30-editor.sh installs
+# from it rather than running `:Lazy sync`, so this asserts the pinning actually
+# took.
+#
+# The comparison is against the snapshot the installer takes BEFORE letting lazy
+# run, not against the live lockfile. Comparing the live lockfile with what is on
+# disk is not a check at all: lazy rewrites that file from disk after every
+# operation, so the two agree by construction even when every pin has been lost.
+# The first version of this check did exactly that, passed on a build where
+# lazy.nvim had in fact drifted off its pin, and is the reason the snapshot
+# exists.
+check "plugins are at their pinned commits" \
+      "$(cat <<'LAZYPIN'
+      python3 - <<'LAZYPY'
+import json, os, subprocess, sys
+expected = os.path.expanduser("~/.local/state/dotfiles/lazy-lock.expected.json")
+try:
+    with open(expected) as fh:
+        pins = json.load(fh)
+except (OSError, ValueError):
+    sys.exit(1)
+root = os.path.expanduser("~/.local/share/nvim/lazy")
+verified = 0
+for name, info in pins.items():
+    d = os.path.join(root, name)
+    # Absent is skipped, not failed: lazy keeps disabled and cond'd plugins in
+    # the lockfile. The counter is what stops that skip from making the whole
+    # check a vacuous pass.
+    if not os.path.isdir(d):
+        continue
+    r = subprocess.run(["git", "-C", d, "rev-parse", "HEAD"],
+                       capture_output=True, text=True)
+    if r.returncode != 0 or r.stdout.strip() != info.get("commit"):
+        sys.exit(1)
+    verified += 1
+sys.exit(0 if verified else 1)
+LAZYPY
+LAZYPIN
+)"
+
 check "vim/vi alias to nvim in zsh" "zsh -ic 'which vim' 2>/dev/null | grep -q nvim"
 # git's own editor precedence (GIT_EDITOR > core.editor > $VISUAL > $EDITOR > vi)
 # is what `git rebase -i` actually consults - ask git directly rather than

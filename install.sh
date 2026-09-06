@@ -36,7 +36,7 @@ Modules (in run order):
   packages   system packages, locale
   shell      zsh, oh-my-zsh, theme, plugins
   tmux       oh-my-tmux + tmux-resurrect
-  editor     Neovim (pinned release) + native Lua config; plain vim gets its own .vimrc
+  editor     Neovim (pinned release) + native Lua config at pinned plugin commits; plain vim gets its own .vimrc
   tools      fzf (Ctrl+R/Ctrl+T/Alt+C), ag, ripgrep, Node.js
   claude     Claude Code, ccstatusline, completion notifications
   claude-output-styles  Claude Code output styles (~/.claude/output-styles)
