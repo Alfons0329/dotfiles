@@ -15,7 +15,7 @@ standalone script with its own `main()`.
 | `packages` | System packages from `packages/*.txt`, locale |
 | `shell` | zsh, oh-my-zsh, starship prompt (or bullet-train with `--powerline`), plugins, login shell |
 | `tmux` | oh-my-tmux + tmux-resurrect |
-| `editor` | Neovim + its Lua config, a separate `.vimrc` for plain vim, and nvim set as the default editor for git/sudoedit/crontab |
+| `editor` | Neovim + its Lua config at pinned plugin commits, a separate `.vimrc` for plain vim, and nvim set as the default editor for git/sudoedit/crontab |
 | `tools` | fzf with key bindings, fd, Node.js, gh, gws |
 | `claude` | Claude Code, ccstatusline, completion notifications |
 | `claude-output-styles` | Claude Code output styles (`~/.claude/output-styles`) |
@@ -144,6 +144,68 @@ build up front was tried and is much worse — these are multi-megabyte generate
 C files (`typescript`'s `parser.c` is 17.5 MB, `bash`'s is 9.9 MB) and
 compiling the set serially took over 27 minutes with no output. That does not
 belong in a script whose promise is that you run it once.
+
+## Plugin versions are pinned too
+
+`home/.config/nvim/lazy-lock.json` is **tracked**, and `modules/30-editor.sh`
+installs from it rather than running `:Lazy sync`. Without that, a fresh machine
+gets whatever fifteen plugins happened to be at `HEAD` that morning — the same
+unpinned bet the `NVIM_VERSION` pin and nvim-treesitter's branch pin already
+exist to avoid, just unstated.
+
+The lockfile has to be tracked *and* the install command changed, because either
+alone is worse than neither. `~/.config/nvim` is a single symlink into this repo,
+so the lockfile lazy.nvim writes at runtime **is** the one in the checkout. And
+`:Lazy sync` is install + clean + *update*: it moves every plugin to the newest
+commit, then rewrites the lockfile from what it just installed. Tracking the file
+while still running `sync` would therefore overwrite the pins during the very
+install meant to honour them — a dirty checkout after every run, pinning nothing.
+
+So `sync_plugins()` runs lazy in **two separate nvim processes**, putting the
+lockfile back in between. That looks redundant and is not.
+
+Every lazy manage operation ends by calling `lock.update()`, which rewrites the
+lockfile from on-disk state *and* mutates lazy's in-memory copy. So within one
+process the pins are gone after the first call: `install` records the actual
+commit of everything installed, and a `restore` following it in the same process
+reads those commits back as if they were the pins, then faithfully restores each
+plugin to where it already was.
+
+| Pass | Call | Why it cannot be dropped |
+| --- | --- | --- |
+| 1 | `install{lockfile=true}` + `clean` | Clones missing plugins directly **at** the pinned commit — the flag is load-bearing, since a plain clone lands on branch `HEAD`. `clean` drops plugins no longer in the spec; `sync` used to do that, and `verify.sh` asserts the plugins snacks replaced are really gone. |
+| — | restore the pin file | Undoes pass 1's rewrite so pass 2 reads the pins, not what pass 1 happened to install. |
+| 2 | `restore` | The only thing that corrects a plugin already installed at the wrong commit. `update{lockfile=true}` filters to plugins that exist on disk, which is why it cannot replace pass 1. |
+
+The single-process version of this shipped first and looked correct on a bare
+build, because `install` had just cloned everything at the right commit and the
+no-op `restore` had nothing to fix. **lazy.nvim itself** is what exposed it:
+`lua/config/lazy.lua` self-bootstraps the manager with `--branch=stable` before
+any of this runs, so it is already installed when `install` filters for missing
+plugins, and it drifted off its pin on every build while the other fourteen
+matched. A byte-comparison of the container's lockfile against the tracked one
+is what caught it.
+
+The lockfile is deliberately **not** forced back after pass 2. At that point disk
+matches the pins, so lazy rewrites identical content and the checkout stays
+clean — but a plugin genuinely added to `lua/plugins/` gets a new entry, which is
+a real change that should appear in `git status` and be committed.
+
+To move plugins forward, do it on purpose:
+
+```sh
+nvim -c 'Lazy update'                       # then quit
+git -C ~/dotfiles diff home/.config/nvim/lazy-lock.json
+git -C ~/dotfiles commit home/.config/nvim/lazy-lock.json -m 'Update plugins'
+```
+
+`test/verify.sh` asserts the pins actually took — against the snapshot the
+installer writes to `~/.local/state/dotfiles/lazy-lock.expected.json` *before*
+letting lazy run, not against the live lockfile. Comparing the live lockfile
+with what is on disk is not a check at all: lazy rewrites that file from disk
+after every operation, so the two agree by construction even when every pin has
+been lost. The first version of the check did exactly that and passed on the
+build where lazy.nvim had drifted, which is why the snapshot exists.
 
 ## Verifying
 

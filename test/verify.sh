@@ -209,6 +209,47 @@ check "nvim >= 0.11"          '[ "$(nvim --version | head -1 | sed "s/^NVIM v[0-
 check "config dir symlinked"  "[ -L $HOME/.config/nvim ]"
 check "init.lua present"      "[ -f $HOME/.config/nvim/init.lua ]"
 check "lazy.nvim bootstrapped" "[ -d $HOME/.local/share/nvim/lazy/lazy.nvim ]"
+
+# home/.config/nvim/lazy-lock.json is tracked and modules/30-editor.sh installs
+# from it rather than running `:Lazy sync`, so this asserts the pinning actually
+# took.
+#
+# The comparison is against the snapshot the installer takes BEFORE letting lazy
+# run, not against the live lockfile. Comparing the live lockfile with what is on
+# disk is not a check at all: lazy rewrites that file from disk after every
+# operation, so the two agree by construction even when every pin has been lost.
+# The first version of this check did exactly that, passed on a build where
+# lazy.nvim had in fact drifted off its pin, and is the reason the snapshot
+# exists.
+check "plugins are at their pinned commits" \
+      "$(cat <<'LAZYPIN'
+      python3 - <<'LAZYPY'
+import json, os, subprocess, sys
+expected = os.path.expanduser("~/.local/state/dotfiles/lazy-lock.expected.json")
+try:
+    with open(expected) as fh:
+        pins = json.load(fh)
+except (OSError, ValueError):
+    sys.exit(1)
+root = os.path.expanduser("~/.local/share/nvim/lazy")
+verified = 0
+for name, info in pins.items():
+    d = os.path.join(root, name)
+    # Absent is skipped, not failed: lazy keeps disabled and cond'd plugins in
+    # the lockfile. The counter is what stops that skip from making the whole
+    # check a vacuous pass.
+    if not os.path.isdir(d):
+        continue
+    r = subprocess.run(["git", "-C", d, "rev-parse", "HEAD"],
+                       capture_output=True, text=True)
+    if r.returncode != 0 or r.stdout.strip() != info.get("commit"):
+        sys.exit(1)
+    verified += 1
+sys.exit(0 if verified else 1)
+LAZYPY
+LAZYPIN
+)"
+
 check "vim/vi alias to nvim in zsh" "zsh -ic 'which vim' 2>/dev/null | grep -q nvim"
 # git's own editor precedence (GIT_EDITOR > core.editor > $VISUAL > $EDITOR > vi)
 # is what `git rebase -i` actually consults - ask git directly rather than
@@ -378,6 +419,37 @@ check "herdr Claude Code integration installed" \
       "$HERDR_BIN integration status 2>/dev/null | grep -q '^claude: current'"
 check "herdr config is a real file, not a symlink into the repo" \
       "[ ! -L $HOME/.config/herdr/config.toml ]"
+
+# The seeded config is what a fresh machine boots with, so hand it to herdr's
+# own parser instead of eyeballing the TOML. `config check` reads key syntax,
+# not just TOML: a deliberately broken "prefix+quux+1..9" comes back as
+# `invalid keybinding ...; disabling binding` and exits 1, which is what makes
+# this worth a check at all. It reads $HOME/.config/herdr/config.toml - in this
+# container, the seeded copy of config.toml.example.
+check "herdr accepts the seeded config, keybindings included" \
+      "$HERDR_BIN config check"
+
+# The three agent-navigation actions ship UNBOUND upstream, so they are the one
+# part of the template that can vanish without herdr objecting: `config check`
+# is perfectly happy with a config that has no agent keys at all. Anchor on the
+# assignment lines - the same file explains the choice in a comment containing
+# `previous_agent = ""`, so an unanchored grep would pass on the comment
+# describing the very default the block exists to replace.
+check "herdr agent navigation keys are bound" \
+      "$(cat <<'HERDRAGENT'
+      [ "$(grep -cE '^(previous_agent|next_agent|focus_agent) = "prefix' \
+            "$HOME/.config/herdr/config.toml")" = 3 ]
+HERDRAGENT
+)"
+
+# Collision guard, because nothing else will do it: herdr does NOT detect two
+# actions on one key. `next_agent = "prefix+n"` validates as `config: ok` while
+# prefix+n is already next_tab, and one of the two silently loses. The keys
+# chosen for agent navigation are unbound in 0.8.2; if a later release claims
+# prefix+shift+j/k or prefix+alt+1..9 as a default, this goes red instead of
+# the binding quietly stopping working.
+check "herdr agent keys do not collide with a herdr default" \
+      "! $HERDR_BIN --default-config | grep -qE '^# [a-z_]+ = \"prefix\\+(shift\\+[jk]|alt\\+1\\.\\.9)\"'"
 
 # The behavioural one. `command -v herdr` would pass on a binary that cannot
 # run at all - which is the likelier failure here than a missing file, since

@@ -36,12 +36,28 @@ Add `--theme kanagawa` or `--theme ayu-dark` to that last line if you don't want
 the default tokyonight; it sets Neovim and the terminal together, and it is
 read once at install time, so choosing here is cheaper than changing later.
 
-**It stops for your password twice**, and `--yes` will not prevent either:
-Homebrew's own installer asks, and so does the login-shell change (`chsh`).
-`--yes` only answers *this* script's prompts, which on macOS is just the
-optional Ghostty build. Everything else — Homebrew, the Brewfile packages, a
-pinned Neovim, the Node toolchain, language servers — is download-bound and
-wants roughly half an hour on a good connection.
+### Everything it will ask you
+
+The whole point is that you start it and walk away, so the interaction is short
+and all of it is listed here. Three prompts, in this order:
+
+| Prompt | From | Answer |
+| --- | --- | --- |
+| Your macOS password | Homebrew's own installer | Type it |
+| Your macOS password again | `chsh`, making zsh the login shell | Type it |
+| `Build the patched Ghostty from source?` | This script, macOS only | `n` — see below |
+
+`--yes` suppresses only the third. The first two are other programs' `sudo`
+prompts and no flag of ours can answer them, which is why the run is not fully
+unattended.
+
+Say **no** to the Ghostty build unless you specifically want it: it needs
+Xcode ≤ 26.3, takes ~30 minutes, and is the one module that has never actually
+run. Declining costs nothing — you still get Ghostty from Homebrew.
+
+Everything else — Homebrew, the Brewfile packages, a pinned Neovim, its pinned
+plugins, the Node toolchain, language servers — is download-bound and wants
+roughly half an hour on a good connection.
 
 ### Why the Command Line Tools come first
 
@@ -79,12 +95,18 @@ regardless. Switching afterwards is one command:
 git -C ~/dotfiles remote set-url origin git@github.com:Alfons0329/dotfiles.git
 ```
 
-### Two things that are not bugs
+### Three things that are not bugs
 
-- **Language servers finish after the script does.** Treesitter parsers compile
+- **Syntax highlighting arrives a moment late.** Treesitter parsers compile
   lazily on first file open, so the first Python or TypeScript buffer you open
-  is unhighlighted for a moment. Forcing them up front was tried and took 27
+  is unhighlighted briefly. Forcing them up front was tried and took 27
   minutes; [docs/INSTALL.md](docs/INSTALL.md) has the numbers.
+- **Neovim plugins never update on their own.** `lazy-lock.json` is tracked and
+  the installer installs *from* it, so a new machine gets the exact plugin
+  commits that are known to work here rather than whatever was at `HEAD` that
+  morning. Moving them forward is deliberate: `:Lazy update`, then commit the
+  lockfile. [docs/INSTALL.md](docs/INSTALL.md) explains why the pin and the
+  install command had to change together.
 - **The bare-machine path is the untested part, not macOS generally.** The
   modules themselves run on macOS routinely. What no run has exercised is a Mac
   with *neither* Homebrew nor the Command Line Tools present, since every macOS
@@ -135,7 +157,7 @@ Modules run in this order, and each is also a standalone script:
 | `packages` | System packages from `packages/*.txt`, locale |
 | `shell` | zsh, oh-my-zsh, starship prompt (or bullet-train with `--powerline`), plugins, login shell |
 | `tmux` | oh-my-tmux + tmux-resurrect |
-| `editor` | Neovim + its Lua config, a separate `.vimrc` for plain vim, and nvim set as the default editor for git/sudoedit/crontab |
+| `editor` | Neovim + its Lua config at pinned plugin commits, a separate `.vimrc` for plain vim, and nvim set as the default editor for git/sudoedit/crontab |
 | `tools` | fzf with key bindings, fd, Node.js, gh, gws |
 | `claude` | Claude Code, ccstatusline, completion notifications |
 | `claude-output-styles` | Claude Code output styles (`~/.claude/output-styles`) |
