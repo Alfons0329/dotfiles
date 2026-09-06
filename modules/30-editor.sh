@@ -136,12 +136,94 @@ deploy_configs() {
     link "$HOME_SRC/.vimrc" "$HOME/.vimrc"
 }
 
+# Install plugins at the commits recorded in lazy-lock.json - NOT `:Lazy sync`.
+#
+# home/.config/nvim/lazy-lock.json is tracked, and ~/.config/nvim is a single
+# symlink into this repo, so the lockfile lazy.nvim writes at runtime *is* the
+# one in the checkout. `:Lazy sync` is install + clean + **update**: it moves
+# every plugin to the newest commit and then rewrites the lockfile from what it
+# just installed, so it would overwrite the pins during the very install meant
+# to honour them. A fresh machine would get whatever the plugins happened to be
+# at HEAD that morning - the same unpinned bet NVIM_VERSION and
+# nvim-treesitter's branch pin already exist to avoid.
+#
+# Two nvim processes, not one, and the lockfile is put back between them. That
+# looks redundant and is not. Every lazy manage operation ends by calling
+# lock.update(), which rewrites the lockfile from on-disk state AND mutates
+# lazy's in-memory copy of it. So within a single process the pins are gone
+# after the first call: `install` records the actual commit of everything
+# installed, and a `restore` that follows it in the same process reads those
+# commits back as if they were the pins and faithfully restores each plugin to
+# where it already was. A bare-machine build still looked correct, because
+# install had just cloned everything at the right commit - the no-op was
+# invisible. It was caught by lazy.nvim itself, which self-bootstraps at
+# `--branch=stable` in lua/config/lazy.lua before any of this runs, is therefore
+# already installed when `install` filters for missing plugins, and so drifted
+# from the pin on every build while the other plugins matched.
+#
+#   pass 1  install{lockfile=true} clones what is missing directly AT the pinned
+#           commit; the flag is load-bearing, since a plain clone lands on
+#           branch HEAD. clean drops plugins no longer in the spec - `sync` used
+#           to do that, and test/verify.sh asserts the plugins snacks replaced
+#           are really gone.
+#   pass 2  restore, in a fresh process reading the restored pin file, is the
+#           only thing that corrects a plugin that was already installed at the
+#           wrong commit - including lazy.nvim. update{lockfile=true} filters to
+#           plugins that already exist on disk, which is why it cannot replace
+#           pass 1.
+#
+# The lockfile is deliberately NOT forced back after pass 2. At that point disk
+# matches the pins, so lazy rewrites the same content and the checkout stays
+# clean - but a plugin genuinely added to lua/plugins/ gets a new entry, which
+# is a real change that should show up in `git status` and be committed.
 sync_plugins() {
-    [ "$DRY_RUN" = "1" ] && { run nvim --headless "+Lazy! sync" +qa; return 0; }
+    local lock="$HOME/.config/nvim/lazy-lock.json"
+    local expected="$HOME/.local/state/dotfiles/lazy-lock.expected.json"
+
+    if [ "$DRY_RUN" = "1" ]; then
+        run nvim --headless -c 'lua require("lazy").install({ lockfile = true, wait = true })' \
+                            -c 'lua require("lazy").clean({ wait = true })' +qa
+        run cp "$lock" "$expected"
+        run nvim --headless -c 'lua require("lazy").restore({ wait = true })' +qa
+        return 0
+    fi
+
     have nvim || { warn "nvim missing; skipping plugin sync."; return 0; }
 
-    log "Installing Neovim plugins..."
-    if nvim --headless "+Lazy! sync" +qa 2>&1 | tail -5; then
+    # Snapshot the pins before lazy can rewrite them. This is also what
+    # test/verify.sh compares against: asking whether the *runtime* lockfile
+    # agrees with what is on disk is not a check at all, because lazy rewrites
+    # that file from disk after every operation, so the two agree by
+    # construction even when every pin has been lost.
+    if [ -f "$lock" ]; then
+        run mkdir -p "$(dirname "$expected")"
+        run cp "$lock" "$expected"
+    fi
+
+    log "Installing Neovim plugins at their pinned commits..."
+
+    # Captured rather than piped. `nvim ... | tail -5` reports *tail's* exit
+    # status, which is always 0, so the failure branch below could never be
+    # reached and a broken plugin install looked successful.
+    # `|| status=1` rather than a bare assignment: this module runs under
+    # `set -e`, so an unguarded command substitution that fails would abort the
+    # whole install instead of reaching the warning below.
+    local out status=0
+    out="$(nvim --headless \
+        -c 'lua require("lazy").install({ lockfile = true, wait = true })' \
+        -c 'lua require("lazy").clean({ wait = true })' +qa 2>&1)" || status=1
+    [ -n "$out" ] && printf '%s\n' "$out" | tail -5
+
+    # Undo pass 1's rewrite so pass 2 reads the pins rather than what pass 1
+    # happened to install.
+    if [ -f "$expected" ]; then
+        run cp "$expected" "$lock"
+    fi
+
+    out="$(nvim --headless -c 'lua require("lazy").restore({ wait = true })' +qa 2>&1)" || status=1
+    [ -n "$out" ] && printf '%s\n' "$out" | tail -5
+
+    if [ "$status" -eq 0 ]; then
         log "Plugins installed."
     else
         warn "Plugin sync reported errors. Open nvim and run :Lazy to inspect."
