@@ -59,7 +59,10 @@ prefix = "ctrl+b"
 # hourly sit on the reliable modifier and only the numeric one carries that
 # risk. alt arrives as Esc+ in both terminals this repo configures
 # (macos-option-as-alt in the Ghostty config, Option-sends-Esc+ in the iTerm2
-# dynamic profile from modules/60-desktop.sh).
+# dynamic profile from modules/60-desktop.sh). All three were pressed on a live
+# two-agent session under Ghostty on macOS 25.5 and do move focus; the iTerm2
+# half of that claim is the profile's documented behaviour, not something that
+# has been exercised.
 #
 # Check any edit to these three with `herdr config check`, which really does
 # parse the key syntax rather than only the TOML: "prefix+quux+1..9" comes back

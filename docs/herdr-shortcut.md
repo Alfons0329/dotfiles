@@ -22,11 +22,13 @@ earlier revision documented an IME fix that herdr reported as applied and which
 did nothing, so "read from the config" and "verified working" are not the same
 claim. See [When the prefix looks dead](#when-the-prefix-looks-dead).
 
-The three agent keys are newer and sit between those two states: `herdr config
-check` parses and accepts them and `herdr server reload-config` applies them with
-no diagnostics, which is more than the IME setting ever managed — that one is a
-behaviour hook, these are bindings the parser demonstrably validates — but they
-have not yet been pressed on a live session.
+The three agent keys were held to the same standard: `herdr config check` parses
+and accepts them, `herdr server reload-config` applies them with no diagnostics,
+and then all three — `J`, `K` and `<A-1>` — were pressed on a live two-agent
+session on macOS 25.5 and observed to move focus. The last step is the one that
+matters, because the IME setting also reported itself applied and did nothing.
+`<A-1>` firing also settles the open question about Alt: Option reaches herdr as
+`Esc+` in this setup, so the indexed row works rather than merely parsing.
 
 This repo's config sets `prefix` and those three agent bindings, and nothing
 else — see [Why nothing is remapped](#why-nothing-is-remapped).
@@ -101,8 +103,10 @@ The numeric jump takes Alt because `<prefix> 1…9` is already tab switching, an
 Alt is the modifier herdr's own config suggests for it. Alt reaches herdr as
 `Esc+` in both terminals this repo configures: Ghostty via `macos-option-as-alt`,
 iTerm2 via the Option-sends-Esc+ setting in the dynamic profile that
-`modules/60-desktop.sh` deploys. In some third terminal where Option types `¡™£`,
-that row is the one that will not fire; `J` / `K` still will.
+`modules/60-desktop.sh` deploys. `<A-1>` was pressed and confirmed under Ghostty;
+the iTerm2 half is the profile's stated behaviour and has not been exercised. In
+some third terminal where Option types `¡™£`, that row is the one that will not
+fire; `J` / `K` still will.
 
 ### Getting these onto a machine that predates them
 
