@@ -44,10 +44,35 @@ install_fzf() {
     fi
 
     log "Configuring fzf shell integration (Ctrl+R / Ctrl+T / Alt+C)..."
+
     # --no-bash/--no-fish: zsh is the shell this setup configures.
-    # --key-bindings --completion --no-update-rc: write ~/.fzf.zsh but leave
-    #   ~/.zshrc alone, since .zshrc is a tracked symlink that already sources it.
-    run "$installer" --key-bindings --completion --no-update-rc --no-bash --no-fish
+    # --key-bindings --completion: write ~/.fzf.zsh, which is the whole point.
+    #
+    # ZDOTDIR is what actually keeps the installer away from ~/.zshrc - a
+    # tracked symlink into this repo that already sources ~/.fzf.zsh itself.
+    # The installer resolves its zsh target as ${ZDOTDIR:-~}/.zshrc, so
+    # pointing ZDOTDIR at a scratch directory makes the tracked file
+    # unreachable rather than merely asked-about. ~/.fzf.zsh is unaffected: its
+    # path comes from $HOME, not ZDOTDIR.
+    #
+    # --no-update-rc alone does NOT hold, and it fails by way of this repo's
+    # own rule 2 (don't grep a file for a string that also appears in its own
+    # comments) aimed back at us. Before appending, the installer greps .zshrc
+    # for the literal `~/.fzf.zsh`. The real source line here spells it
+    # "$HOME/.fzf.zsh", so the only thing that matches is the *comment* above
+    # it. Its "these matches all seem to be commented - continue anyway?"
+    # branch then reassigns update=1, overriding --no-update-rc, and asks; ask()
+    # defaults REPLY to "y", so under install.sh - non-interactive, stdin at
+    # EOF - the answer is always yes. Every run appended another
+    # `[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh` to the tracked .zshrc, which
+    # surfaced only as a dirty git status nobody could account for.
+    local zdot
+    zdot="$(mktemp -d)"
+    # shellcheck disable=SC2064  # expand $zdot now, not at trap time
+    trap "rm -rf '$zdot'" RETURN
+
+    run env ZDOTDIR="$zdot" "$installer" \
+        --key-bindings --completion --no-update-rc --no-bash --no-fish
 
     is_linux && export PATH="$HOME/.fzf/bin:$PATH"
     return 0

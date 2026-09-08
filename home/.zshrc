@@ -83,7 +83,18 @@ fi
 
 plugins=(git zsh-autosuggestions zsh-syntax-highlighting)
 
-source "$ZSH/oh-my-zsh.sh"
+# Guarded, not bare. oh-my-zsh's installer can leave ~/.oh-my-zsh present but
+# empty (a `git fetch` that died partway - see modules/10-shell.sh), and a bare
+# source of a missing file printed
+#   .zshrc:source:NN: no such file or directory: ~/.oh-my-zsh/oh-my-zsh.sh
+# at the top of every single new shell. Degrade to a working shell with one
+# actionable line instead: starship (initialized just below) owns the prompt
+# regardless, so what is actually lost here is the plugins.
+if [ -r "$ZSH/oh-my-zsh.sh" ]; then
+    source "$ZSH/oh-my-zsh.sh"
+else
+    print -u2 "dotfiles: $ZSH/oh-my-zsh.sh missing - repair with: ./install.sh --only shell"
+fi
 
 # starship (https://starship.rs) - the default prompt. Its init has to run
 # after oh-my-zsh.sh finishes sourcing, since a theme (if one loaded) would
@@ -171,3 +182,4 @@ alias agi='ag -i'
 # See .zshrc.local.example in the dotfiles repo for the template.
 # -------------------------------------------------------------------
 [ -f "$HOME/.zshrc.local" ] && source "$HOME/.zshrc.local"
+

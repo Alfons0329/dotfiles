@@ -11,13 +11,45 @@ ZSH_DIR="$HOME/.oh-my-zsh"
 ZSH_CUSTOM_DIR="$ZSH_DIR/custom"
 
 install_oh_my_zsh() {
-    if [ -d "$ZSH_DIR" ]; then
+    # The existence of ~/.oh-my-zsh is not proof that oh-my-zsh is installed.
+    # Upstream's installer does `git init` + `git remote add` + `git fetch`, so
+    # a fetch that dies partway (flaky network, a proxy, an interrupted run)
+    # leaves the directory there, with a .git in it, on branch main, with no
+    # commits and therefore *no checked-out files at all*. Observed on a fresh
+    # Mac: every new shell then opened with
+    #   .zshrc:source:86: no such file or directory: ~/.oh-my-zsh/oh-my-zsh.sh
+    # and, because this asked only whether the directory existed, every later
+    # ./install.sh printed "oh-my-zsh already installed" and skipped past the
+    # repair - so the one command that should have fixed it never could.
+    # Ask for the file .zshrc actually sources.
+    if [ -r "$ZSH_DIR/oh-my-zsh.sh" ]; then
         skip "oh-my-zsh already installed"
     else
+        # The installer refuses to write into a non-empty directory, so a
+        # half-finished install has to be moved aside before the retry. Nothing
+        # of value is lost: custom/themes and custom/plugins are repopulated by
+        # install_theme and install_zsh_plugins later in main().
+        if [ -e "$ZSH_DIR" ]; then
+            local backup
+            backup="$ZSH_DIR.broken.$(_timestamp)"
+            warn "$ZSH_DIR exists but has no oh-my-zsh.sh (interrupted install)."
+            warn "  Moving it to $backup and reinstalling."
+            run mv "$ZSH_DIR" "$backup"
+        fi
+
         log "Installing oh-my-zsh..."
         # --unattended: don't run zsh at the end, don't try to chsh (we handle
         # the shell change ourselves, further down).
         run_sh "sh -c \"\$(curl $CURL_OPTS https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)\" '' --unattended --keep-zshrc"
+
+        # Assert the outcome, not the exit status. The installer can leave the
+        # husk described above behind while still returning 0, and a warning
+        # here is the difference between "one line of this run failed" and a
+        # broken prompt on every shell with no clue where it came from.
+        if [ "$DRY_RUN" != "1" ] && [ ! -r "$ZSH_DIR/oh-my-zsh.sh" ]; then
+            warn "oh-my-zsh install did not produce $ZSH_DIR/oh-my-zsh.sh."
+            warn "  Shells will start without it. Re-run: ./install.sh --only shell"
+        fi
     fi
 
     run mkdir -p "$ZSH_CUSTOM_DIR/themes" "$ZSH_CUSTOM_DIR/plugins"
