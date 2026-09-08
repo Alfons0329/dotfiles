@@ -31,6 +31,12 @@ fi
 : "${NVIM_VERSION:=v0.11.7}"
 NVIM_MIN_MINOR=11
 
+# Where the pinned release gets linked onto PATH. A variable rather than a
+# literal repeated five times, because the version probe, the install, the
+# "does it even run" check and the shadow check below must all agree on which
+# nvim they are talking about - the bug that motivated this had them disagree.
+NVIM_BIN="/usr/local/bin/nvim"
+
 nvim_asset_arch() {
     case "$(uname -m)" in
         x86_64)        echo "x86_64" ;;
@@ -57,10 +63,14 @@ install_neovim() {
         url="https://github.com/neovim/neovim/releases/download/${NVIM_VERSION}/${tarball}"
     fi
 
-    # Already installed at the pinned version? Nothing to do.
-    if have nvim && [ "$NVIM_VERSION" != "latest" ]; then
+    # Already installed at the pinned version? Ask the path we install to, not
+    # whatever PATH resolves. On macOS PATH may resolve to Homebrew's floating
+    # neovim (see ensure_pinned_nvim_wins below), which never equals the pin -
+    # so asking `nvim` re-downloaded and reinstalled the tarball on every run
+    # while reporting nothing was wrong.
+    if [ -x "$NVIM_BIN" ] && [ "$NVIM_VERSION" != "latest" ]; then
         local current
-        current="v$(nvim --version 2>/dev/null | head -1 | sed 's/^NVIM v//')"
+        current="v$("$NVIM_BIN" --version 2>/dev/null | head -1 | sed 's/^NVIM v//')"
         if [ "$current" = "$NVIM_VERSION" ]; then
             skip "Neovim $NVIM_VERSION already installed"
             return 0
@@ -76,9 +86,9 @@ install_neovim() {
 
     if [ "$DRY_RUN" = "1" ]; then
         run tar -xzf "$tmp/$tarball" -C "$tmp"
-        run "$SUDO" mkdir -p /opt
+        run "$SUDO" mkdir -p /opt "$(dirname "$NVIM_BIN")"
         run "$SUDO" mv "$tmp/nvim-${os_prefix}-$arch" /opt/
-        run "$SUDO" ln -sf "/opt/nvim-${os_prefix}-$arch/bin/nvim" /usr/local/bin/nvim
+        run "$SUDO" ln -sf "/opt/nvim-${os_prefix}-$arch/bin/nvim" "$NVIM_BIN"
         return 0
     fi
 
@@ -90,16 +100,27 @@ install_neovim() {
     as_root mkdir -p /opt
     as_root rm -rf "$target"
     as_root mv "$extracted" /opt/
-    as_root ln -sf "$target/bin/nvim" /usr/local/bin/nvim
+
+    # /usr/local/bin is not guaranteed to exist, and on Apple Silicon it
+    # usually does not: Homebrew lives in /opt/homebrew there, so nothing ever
+    # creates /usr/local, and `ln -s ... /usr/local/bin/nvim` fails with
+    # ENOENT. Under `set -e` that aborted this entire module at the second-to-
+    # last line of its first function - before deploy_configs - so a fresh Mac
+    # ended up with the tarball unpacked in /opt, no ~/.config/nvim, no
+    # ~/.dotfiles_theme and no plugins. That reads as "Neovim was never
+    # installed", not as one missing directory, which is how it went
+    # undiagnosed: the module's own summary line just said "editor failed".
+    as_root mkdir -p "$(dirname "$NVIM_BIN")"
+    as_root ln -sf "$target/bin/nvim" "$NVIM_BIN"
 
     # A binary that unpacks but won't run is the failure mode this pin exists to
     # prevent (glibc too old on Linux). Fail loudly: silently falling back to a
     # package manager's version would install a Neovim this config was not
     # tested against, and the user would discover that as a wall of Lua errors
     # instead of one message.
-    if ! /usr/local/bin/nvim --version >/dev/null 2>&1; then
+    if ! "$NVIM_BIN" --version >/dev/null 2>&1; then
         local err
-        err="$(/usr/local/bin/nvim --version 2>&1 | head -3 || true)"
+        err="$("$NVIM_BIN" --version 2>&1 | head -3 || true)"
         die "Neovim $NVIM_VERSION does not run on this system:
     $err
 $(is_macos || echo "
@@ -110,7 +131,60 @@ $(is_macos || echo "
   (v0.11.0 is the floor: blink.cmp requires Neovim >= 0.11.)"
     fi
 
-    log "Installed $(nvim --version | head -1)"
+    log "Installed $("$NVIM_BIN" --version | head -1)"
+
+    # Put the symlink's directory on PATH for the remainder of this run.
+    #
+    # On a fresh Apple Silicon Mac /usr/local/bin is created three lines above
+    # this one, so the shell running install.sh started without it and every
+    # later `have nvim` in this module was false - which silently skipped
+    # configure_default_editor and left core.editor unset. That is invisible
+    # from an interactive zsh, where .zshrc exports $EDITOR anyway, and shows
+    # up only where .zshrc was never sourced: `git rebase` from a GUI client,
+    # sudoedit, crontab -e. Exactly the gap configure_default_editor exists to
+    # close, defeated by the PATH of the shell that was already running.
+    case ":$PATH:" in
+        *":$(dirname "$NVIM_BIN"):"*) ;;
+        *) PATH="$(dirname "$NVIM_BIN"):$PATH"; export PATH ;;
+    esac
+}
+
+# Make sure the pinned Neovim is the one PATH actually resolves to.
+#
+# Installing to /usr/local/bin is not enough on macOS: `brew shellenv` puts
+# /opt/homebrew/bin *ahead* of /usr/local/bin, so a `brew install neovim` -
+# Homebrew's floating stable, which is exactly the 0.12.x the NVIM_VERSION pin
+# at the top of this file exists to avoid - silently wins over the release this
+# module just installed. The symptom is not subtle but is very easy to misread:
+# the treesitter decoration-provider crash documented above, inside an editor
+# the installer had just reported installing at the pinned version.
+#
+# ~/.local/bin is first in .zshrc's PATH and needs no sudo, so a shim there
+# wins without touching Homebrew's prefix or uninstalling a package the user
+# may have installed on purpose. Compares versions rather than paths: what
+# matters is which Neovim runs, not which file it came from.
+ensure_pinned_nvim_wins() {
+    [ "$DRY_RUN" = "1" ] && return 0
+    [ "$NVIM_VERSION" = "latest" ] && return 0
+    [ -x "$NVIM_BIN" ] || return 0
+
+    # Not-found is a case to fix, not one to skip. An earlier version returned
+    # early when `have nvim` was false, which is precisely the state a fresh
+    # Mac is in - $NVIM_BIN installed, its directory absent from the PATH this
+    # process inherited - so the shim never got written on the one machine that
+    # needed it most.
+    local on_path
+    if have nvim; then
+        on_path="v$(nvim --version 2>/dev/null | head -1 | sed 's/^NVIM v//')"
+        [ "$on_path" = "$NVIM_VERSION" ] && return 0
+        warn "PATH resolves nvim to $(command -v nvim) ($on_path), not the pinned $NVIM_VERSION."
+    else
+        warn "nvim is installed at $NVIM_BIN but is not on PATH."
+    fi
+    warn "  Adding ~/.local/bin/nvim so the pinned build wins."
+    run mkdir -p "$HOME/.local/bin"
+    run ln -sf "$NVIM_BIN" "$HOME/.local/bin/nvim"
+    hash -r 2>/dev/null || true
 }
 
 check_neovim_version() {
@@ -228,6 +302,37 @@ sync_plugins() {
     else
         warn "Plugin sync reported errors. Open nvim and run :Lazy to inspect."
     fi
+}
+
+# lazy.nvim clones with `--filter=blob:none`, so a plugin's file contents are
+# backfilled from the remote during checkout rather than at clone time. When
+# that backfill fails - a dropped connection, a rate limit - git leaves HEAD on
+# the correct commit with some tracked files simply absent, and nothing reports
+# it: `:Lazy` lists the plugin as installed and a pin check passes, because the
+# commit really is right. The breakage only surfaces at runtime. A fresh install
+# here left copilot.lua missing lua/copilot/lsp/installer.lua, so every nvim
+# start raised `Failed to run config for copilot.lua`.
+repair_plugin_worktrees() {
+    local root="$HOME/.local/share/nvim/lazy"
+    [ -d "$root" ] || return 0
+
+    local d name missing repaired=0
+    for d in "$root"/*/; do
+        [ -d "$d.git" ] || continue
+        name="$(basename "$d")"
+        # `git status --porcelain` prints " D" for a tracked file that is gone
+        # from the working tree. `|| true`: grep -c exits 1 on a zero count,
+        # which would abort this module under `set -e`.
+        missing="$(cd "$d" && git status --porcelain 2>/dev/null | grep -c '^ D' || true)"
+        [ "${missing:-0}" -gt 0 ] || continue
+
+        warn "$name is missing $missing tracked file(s); restoring from its pinned commit."
+        run_sh "cd '$d' && git checkout -- ."
+        repaired=$((repaired + 1))
+    done
+
+    [ "$repaired" -gt 0 ] && log "Repaired $repaired incomplete plugin checkout(s)."
+    return 0
 }
 
 # Report what treesitter finished installing, without waiting for it.
@@ -351,11 +456,13 @@ configure_default_editor() {
 
 main() {
     install_neovim
+    ensure_pinned_nvim_wins
     check_neovim_version
     deploy_configs
     write_theme_marker
     configure_default_editor
     sync_plugins
+    repair_plugin_worktrees
     report_treesitter_parsers
     install_lsp_servers
     warm_treesitter_parsers

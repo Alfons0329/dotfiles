@@ -35,6 +35,50 @@ deploy_ghostty_config() {
     link "$HOME_SRC/.config/ghostty/config" "$HOME/.config/ghostty/config"
 }
 
+# Install the terminfo entry Ghostty ships inside its own app bundle.
+#
+# Ghostty exports TERM=xterm-ghostty but does not put that entry in the system
+# terminfo database, so until it is installed where ncurses looks, anything
+# that opens a terminal by name fails outright. tmux is the one that bites:
+# it exits the instant it tries to attach, with
+#   missing or unsuitable terminal: xterm-ghostty
+# and since `tmux new-session -d` never opens a terminal, the detached form
+# keeps working - so it presents as "tmux quits the moment I launch it" rather
+# than as a missing terminfo entry, and reads like broken tmux.
+#
+# ~/.terminfo, not /usr/share/terminfo: no sudo, and ncurses searches it first.
+# .zshrc separately rewrites TERM to xterm-256color when infocmp cannot resolve
+# it, which keeps a shell usable on a machine this step never ran on - but it
+# does so by discarding the capabilities Ghostty actually has, so it is a
+# fallback, not a substitute for installing the real entry.
+install_ghostty_terminfo() {
+    is_macos || return 0
+
+    local src="/Applications/Ghostty.app/Contents/Resources/terminfo"
+    if [ ! -d "$src" ] && [ "$DRY_RUN" != "1" ]; then
+        skip "Ghostty.app not installed; skipping its terminfo"
+        return 0
+    fi
+
+    # Ask ncurses whether it can already resolve the entry rather than testing
+    # for ~/.terminfo. The entry may have arrived from a system-wide install or
+    # a newer ncurses, and the question that matters is whether the lookup
+    # tmux performs succeeds - not whether a particular directory exists.
+    if [ "$DRY_RUN" != "1" ] && infocmp xterm-ghostty >/dev/null 2>&1; then
+        skip "xterm-ghostty terminfo already resolves"
+        return 0
+    fi
+
+    log "Installing Ghostty's terminfo into ~/.terminfo..."
+    run mkdir -p "$HOME/.terminfo"
+    run_sh "cp -R '$src/'* '$HOME/.terminfo/'"
+
+    if [ "$DRY_RUN" != "1" ] && ! infocmp xterm-ghostty >/dev/null 2>&1; then
+        warn "xterm-ghostty still does not resolve after the copy."
+        warn "  tmux will exit on launch under Ghostty; .zshrc's TERM rewrite is the fallback."
+    fi
+}
+
 # Write the resolved theme to the machine-local ghostty-local.conf override.
 # The theme gets its default from the tracked config, so for tokyonight
 # (the default), we write nothing - the tracked `theme = TokyoNight Night` is used.
@@ -163,6 +207,7 @@ main() {
 
     install_casks
     deploy_ghostty_config
+    install_ghostty_terminfo
     deploy_ghostty_theme
     deploy_iterm_profile
 }
