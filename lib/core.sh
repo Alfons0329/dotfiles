@@ -145,6 +145,40 @@ detect_os() {
     esac
     log "Detected $OS_NAME (pkg manager: $PKG_MGR)"
     export PKG_MGR OS_NAME
+    brew_env
+}
+
+# ------------------------------------------------------------------
+# brew_env - put Homebrew on PATH for *this* process.
+#
+# modules/00-packages.sh installs Homebrew and evals `brew shellenv`, but
+# install.sh runs every module in its own subshell, so that PATH change dies
+# with module 00 and never reaches modules 10-70. On a machine that already had
+# Homebrew the bug is invisible, because the parent shell's PATH already had it.
+# On a genuinely fresh Mac - where this run is what installed Homebrew - every
+# later module's `have brew` was false, and each one degraded quietly:
+#   40-tools    "brew missing; skipping fzf shell integration"  -> no Ctrl+R
+#   60-desktop  "brew not found; skipping casks"                -> no fonts
+# Both are warnings rather than errors, so install.sh still printed "Setup
+# complete" over a machine missing its fonts and its history search.
+#
+# Called from detect_os (which covers running a module standalone) and from
+# install.sh's module loop, which is what actually carries the PATH forward
+# once module 00 has run. uname rather than is_macos: this has to work before
+# detect_os has set PKG_MGR.
+# ------------------------------------------------------------------
+brew_env() {
+    [ "$(uname -s)" = "Darwin" ] || return 0
+    have brew && return 0
+
+    local b
+    for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+        if [ -x "$b" ]; then
+            eval "$("$b" shellenv)"
+            return 0
+        fi
+    done
+    return 0
 }
 
 is_macos() { [ "$PKG_MGR" = "brew" ]; }

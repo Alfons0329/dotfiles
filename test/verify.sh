@@ -67,6 +67,13 @@ check "fzf >= 0.40" '
 # The real proof that Ctrl+R works. ~/.fzf.zsh existing is necessary but not
 # sufficient; the widget has to actually be bound in an interactive zsh.
 check "fzf.zsh written to \$HOME" "[ -f $HOME/.fzf.zsh ]"
+# fzf's installer appends its own `source ~/.fzf.zsh` line to .zshrc unless it
+# is stopped by more than --no-update-rc (see modules/40-tools.sh). .zshrc here
+# is a symlink into the repo, so when that happened the *tracked* file grew a
+# duplicate line on every install. Anchored at the start of the line so the
+# comment above the real one is not counted.
+check "fzf sourced exactly once in .zshrc" \
+      "[ \"\$(grep -c '^\[ -f .*fzf\.zsh' $HOME/.zshrc)\" -eq 1 ]"
 check "Ctrl+R -> fzf-history-widget" \
       "zsh -ic 'bindkey \"^R\"' 2>/dev/null | grep -q fzf-history-widget"
 check "Ctrl+T -> fzf-file-widget" \
@@ -76,7 +83,16 @@ check "Ctrl+T -> fzf-file-widget" \
 section "zsh"
 # ------------------------------------------------------------------
 ZSH_CUSTOM="$HOME/.oh-my-zsh/custom"
-check "oh-my-zsh installed"        "[ -d $HOME/.oh-my-zsh ]"
+# NOT `[ -d ~/.oh-my-zsh ]`, which is what this used to be. An interrupted
+# install leaves the directory there with a .git in it and nothing checked out,
+# so the presence check passed on a machine whose every new shell printed
+# "no such file or directory: ~/.oh-my-zsh/oh-my-zsh.sh". Ask for the file
+# .zshrc sources, then ask a real shell whether sourcing it worked - `zsh -ic
+# exit` below cannot catch this, because zsh carries on after a failed source
+# and still exits 0.
+check "oh-my-zsh installed"        "[ -r $HOME/.oh-my-zsh/oh-my-zsh.sh ]"
+check "no oh-my-zsh error on shell start" \
+      "! zsh -ic exit 2>&1 | grep -q 'oh-my-zsh.sh'"
 check "zsh-autosuggestions"        "[ -d $ZSH_CUSTOM/plugins/zsh-autosuggestions ]"
 check "zsh-syntax-highlighting"    "[ -d $ZSH_CUSTOM/plugins/zsh-syntax-highlighting ]"
 check ".zshrc is a symlink"        "[ -L $HOME/.zshrc ]"
@@ -130,6 +146,22 @@ check "docker's bare TERM=xterm is upgraded" \
 # ------------------------------------------------------------------
 section "tmux"
 # ------------------------------------------------------------------
+# Every tmux check below runs on a dedicated socket, never the default one.
+#
+# Two reasons, and the first one cost a real session. Safety: these checks
+# create and destroy sessions, and on the default socket they do that inside
+# whatever tmux the person running the suite is sitting in - a stray
+# kill-server, or killing the last remaining session, takes their work with it.
+#
+# Honesty: `tmux show -g` reports the *running server's* options, not the
+# config file. On the default socket, a server that happened to be up already
+# answered from a config it loaded hours earlier, so these checks passed or
+# failed on stale global state rather than on the config they name - and
+# `-f <file> new-session` is silently ignored when a server is already up,
+# which made the tmux.conf.user check below nondeterministic. A private socket
+# starts a fresh server that actually reads the config under test.
+TM="tmux -L dotfiles_verify"
+
 check "oh-my-tmux cloned"       "[ -d $HOME/.tmux ]"
 check ".tmux.conf symlinked"    "[ -L $HOME/.tmux.conf ]"
 check ".tmux.conf.local linked" "[ -L $HOME/.tmux.conf.local ]"
@@ -138,7 +170,7 @@ check "mouse mode on"           "grep -q '^set -g mouse on' $HOME/.tmux.conf.loc
 check "vi copy mode"            "grep -q '^setw -g mode-keys vi' $HOME/.tmux.conf.local"
 check "MouseDragEnd unbound"    "grep -q 'unbind -T copy-mode-vi MouseDragEnd1Pane' $HOME/.tmux.conf.local"
 check "bracketed paste passthrough" "grep -q 'smBP' $HOME/.tmux.conf.local"
-check "tmux config parses"      "tmux -f $HOME/.tmux.conf new-session -d -s verify && tmux kill-session -t verify"
+check "tmux config parses"      "$TM -f $HOME/.tmux.conf new-session -d -s verify && $TM kill-session -t verify"
 
 # Status bar: session on the left, clock and user on the right, and none of the
 # things that were removed. The wttr.in check matters most - that was a shell-out
@@ -153,7 +185,7 @@ check "24-bit colour enabled"   "grep -q '^tmux_conf_theme_24b_colour=true' $HOM
 # server declares truecolor support for 256-colour terminal types - not just
 # that the line requesting it is present.
 check "tmux truecolor actually applied to a live session" \
-      "tmux new-session -d -s verify_24b && tmux show -g terminal-overrides | grep -Eq '256col.*:Tc' && tmux kill-session -t verify_24b"
+      "$TM new-session -d -s verify_24b && $TM show -g terminal-overrides | grep -Eq '256col.*:Tc' && $TM kill-session -t verify_24b"
 # The check above still only covers terminals whose TERM contains "256col".
 # That pattern matches xterm-256color and nothing else in play: not
 # xterm-ghostty, not the bare "xterm" docker hands out. Declaring RGB for "*"
@@ -161,7 +193,7 @@ check "tmux truecolor actually applied to a live session" \
 # that is the fix for the same tmux session looking right from iTerm2 and
 # 8-colour from Ghostty. terminal-features needs tmux >= 3.2 (22.04 ships 3.2a).
 check "tmux declares RGB for any terminal name" \
-      "tmux new-session -d -s verify_rgb && tmux show -g terminal-features | grep -q '[*]:RGB' && tmux kill-session -t verify_rgb"
+      "$TM new-session -d -s verify_rgb && $TM show -g terminal-features | grep -q '[*]:RGB' && $TM kill-session -t verify_rgb"
 # ~/.tmux.conf.user is the machine-local override hook, and whether it wins is
 # purely a question of oh-my-tmux's ordering. Sourcing it from .tmux.conf.local
 # looked obviously correct and was wrong: _apply_configuration() runs afterwards
@@ -172,8 +204,19 @@ check "tmux declares RGB for any terminal name" \
 #
 # Runs in a subshell: check() eval's this string in the current shell, so a bare
 # `exit` would take verify.sh down with it rather than failing one check.
-check "machine-local tmux.conf.user overrides win over the theme" \
-      "$(cat <<'TMUXUSER'
+# Multi-line check bodies are read into a variable with a plain heredoc, never
+# built with "$(cat <<'TAG' ... TAG)".
+#
+# bash 3.2 - what macOS ships - scans a $( ) for its closing paren without
+# honouring a heredoc inside it, so the first unbalanced ) or ' in the body
+# terminates the substitution early. This check is where that was caught: the
+# ) of its `*)` case pattern was taken as the end of the substitution, so
+# check() received `case ... in *040506*) exit 0 ;; * exit 1 ;; esac` plus a
+# stray heredoc terminator - a syntax error. eval failed, the body never ran,
+# and it reported a plain [FAIL] that looked like tmux misbehaving. Docker runs
+# bash 5, which parses it correctly, so the suite passed there the whole time
+# this check was inert on a Mac.
+read -r -d '' TMUX_USER_CHECK <<'TMUXUSER' || true
       (
         _bak=""
         if [ -e "$HOME/.tmux.conf.user" ]; then
@@ -181,16 +224,16 @@ check "machine-local tmux.conf.user overrides win over the theme" \
             mv "$HOME/.tmux.conf.user" "$_bak"
         fi
         printf 'set -g status-style "fg=#010203,bg=#040506"\n' > "$HOME/.tmux.conf.user"
-        tmux -f "$HOME/.tmux.conf" new-session -d -s verify_user
+        $TM -f "$HOME/.tmux.conf" new-session -d -s verify_user
         sleep 2
-        _got="$(tmux show -gv status-style 2>/dev/null)"
-        tmux kill-session -t verify_user 2>/dev/null
+        _got="$($TM show -gv status-style 2>/dev/null)"
+        $TM kill-session -t verify_user 2>/dev/null
         rm -f "$HOME/.tmux.conf.user"
         [ -n "$_bak" ] && mv "$_bak" "$HOME/.tmux.conf.user"
         case "$_got" in *040506*) exit 0 ;; *) exit 1 ;; esac
       )
 TMUXUSER
-)"
+check "machine-local tmux.conf.user overrides win over the theme" "$TMUX_USER_CHECK"
 check "status left is the session name only" \
       "grep -q '^tmux_conf_theme_status_left=.*#S' $HOME/.tmux.conf.local && ! grep -q '^tmux_conf_theme_status_left=.*uptime' $HOME/.tmux.conf.local"
 check "status right has clock + user" \
@@ -201,11 +244,23 @@ check "status right has clock + user" \
 check "no shell-out in the status bar" \
       "! grep -E '^tmux_conf_theme_status_(left|right)=' $HOME/.tmux.conf.local | grep -q '#('"
 
+# Ours alone, so this is safe - unlike a bare `tmux kill-server`, which would
+# take down the session the person running this is using.
+$TM kill-server 2>/dev/null || true
+
 # ------------------------------------------------------------------
 section "Neovim"
 # ------------------------------------------------------------------
 check "nvim installed"        "command -v nvim"
 check "nvim >= 0.11"          '[ "$(nvim --version | head -1 | sed "s/^NVIM v[0-9]*\.\([0-9]*\).*/\1/")" -ge 11 ]'
+# The >= 0.11 floor above passes on 0.12, so on its own it cannot catch a
+# Homebrew neovim shadowing the pinned release - /opt/homebrew/bin precedes
+# /usr/local/bin in the PATH `brew shellenv` sets. 0.12 is exactly what the pin
+# in modules/30-editor.sh exists to keep out: its treesitter query-predicate
+# change crashes the decoration provider on any file with a fenced code block.
+# Ask the nvim that PATH actually resolves, since that is the one that runs.
+check "nvim is 0.11.x, not a floating 0.12" \
+      '[ "$(nvim --version | head -1 | sed "s/^NVIM v[0-9]*\.\([0-9]*\).*/\1/")" -eq 11 ]'
 check "config dir symlinked"  "[ -L $HOME/.config/nvim ]"
 check "init.lua present"      "[ -f $HOME/.config/nvim/init.lua ]"
 check "lazy.nvim bootstrapped" "[ -d $HOME/.local/share/nvim/lazy/lazy.nvim ]"
@@ -221,8 +276,7 @@ check "lazy.nvim bootstrapped" "[ -d $HOME/.local/share/nvim/lazy/lazy.nvim ]"
 # The first version of this check did exactly that, passed on a build where
 # lazy.nvim had in fact drifted off its pin, and is the reason the snapshot
 # exists.
-check "plugins are at their pinned commits" \
-      "$(cat <<'LAZYPIN'
+read -r -d '' LAZY_PIN_CHECK <<'LAZYPIN' || true
       python3 - <<'LAZYPY'
 import json, os, subprocess, sys
 expected = os.path.expanduser("~/.local/state/dotfiles/lazy-lock.expected.json")
@@ -235,9 +289,18 @@ root = os.path.expanduser("~/.local/share/nvim/lazy")
 verified = 0
 for name, info in pins.items():
     d = os.path.join(root, name)
-    # Absent is skipped, not failed: lazy keeps disabled and cond'd plugins in
-    # the lockfile. The counter is what stops that skip from making the whole
-    # check a vacuous pass.
+    # Absent is skipped, not failed: lazy keeps disabled and conditional
+    # plugins in the lockfile. The counter is what stops that skip from making
+    # the whole check a vacuous pass.
+    #
+    # Keep this heredoc free of apostrophes. It is nested inside a $( ), and
+    # bash 3.2 - which is what macOS ships - scans for the closing paren
+    # without honouring the heredoc, so a lone apostrophe in a *comment* here
+    # reads as an unterminated quote. The script then dies at the next line
+    # containing a paren, reporting a syntax error 25 lines away from the
+    # actual cause. The Docker suite runs bash 5, where this parses fine, so
+    # it passed there the whole time verify.sh could not start at all on a
+    # Mac. The word that did it was a contraction of "conditional".
     if not os.path.isdir(d):
         continue
     r = subprocess.run(["git", "-C", d, "rev-parse", "HEAD"],
@@ -248,7 +311,23 @@ for name, info in pins.items():
 sys.exit(0 if verified else 1)
 LAZYPY
 LAZYPIN
-)"
+check "plugins are at their pinned commits" "$LAZY_PIN_CHECK"
+
+# A pin check passes on a plugin whose files are half missing. lazy clones with
+# `--filter=blob:none`, so a failed blob backfill leaves HEAD on the right
+# commit with tracked files absent. copilot.lua arrived that way on a fresh
+# Mac: the commit verified as correct while every nvim start raised
+# `no field package.preload copilot.lsp.installer`.
+read -r -d '' LAZY_FILES_CHECK <<'LAZYFILES' || true
+      (
+        for _d in "$HOME"/.local/share/nvim/lazy/*/; do
+            [ -d "$_d.git" ] || continue
+            git -C "$_d" status --porcelain 2>/dev/null | grep -q '^ D' && exit 1
+        done
+        exit 0
+      )
+LAZYFILES
+check "plugin checkouts are complete" "$LAZY_FILES_CHECK"
 
 check "vim/vi alias to nvim in zsh" "zsh -ic 'which vim' 2>/dev/null | grep -q nvim"
 # git's own editor precedence (GIT_EDITOR > core.editor > $VISUAL > $EDITOR > vi)
@@ -435,12 +514,11 @@ check "herdr accepts the seeded config, keybindings included" \
 # assignment lines - the same file explains the choice in a comment containing
 # `previous_agent = ""`, so an unanchored grep would pass on the comment
 # describing the very default the block exists to replace.
-check "herdr agent navigation keys are bound" \
-      "$(cat <<'HERDRAGENT'
+read -r -d '' HERDR_AGENT_CHECK <<'HERDRAGENT' || true
       [ "$(grep -cE '^(previous_agent|next_agent|focus_agent) = "prefix' \
             "$HOME/.config/herdr/config.toml")" = 3 ]
 HERDRAGENT
-)"
+check "herdr agent navigation keys are bound" "$HERDR_AGENT_CHECK"
 
 # Collision guard, because nothing else will do it: herdr does NOT detect two
 # actions on one key. `next_agent = "prefix+n"` validates as `config: ok` while
@@ -462,8 +540,7 @@ check "herdr agent keys do not collide with a herdr default" \
 # for the same reason as the tmux.conf.user check above: check() eval's this
 # string in the current shell, so the bare `exit` carrying the result out would
 # otherwise take verify.sh down with it.
-check "herdr server starts, serves its socket, and stops" \
-      "$(cat <<'HERDRSRV'
+read -r -d '' HERDR_SERVER_CHECK <<'HERDRSRV' || true
       (
         PATH="$HOME/.local/bin:$PATH"
         export HERDR_SESSION=verify_herdr
@@ -482,7 +559,7 @@ check "herdr server starts, serves its socket, and stops" \
         exit $_rc
       )
 HERDRSRV
-)"
+check "herdr server starts, serves its socket, and stops" "$HERDR_SERVER_CHECK"
 
 # ------------------------------------------------------------------
 section "codegraph"
@@ -502,8 +579,7 @@ check "codegraph installed"     "$CODEGRAPH_BIN --version"
 # the mcpServers entry rather than grepping it for "codegraph": that file also
 # records a history entry per project directory, so a bare string match would
 # pass on any machine that has ever cd'd into a path containing the word.
-check "codegraph wired into Claude Code as an MCP server" \
-      "$(cat <<'CGWIRE'
+read -r -d '' CG_WIRE_CHECK <<'CGWIRE' || true
       python3 - <<'PY'
 import json, os, sys
 try:
@@ -514,7 +590,7 @@ except (OSError, ValueError):
 sys.exit(0 if "codegraph" in (data.get("mcpServers") or {}) else 1)
 PY
 CGWIRE
-)"
+check "codegraph wired into Claude Code as an MCP server" "$CG_WIRE_CHECK"
 
 # `codegraph install` takes --location=global or --location=local, and `local`
 # writes the MCP config plus a marker-fenced block into the *current project*.
@@ -532,8 +608,7 @@ check "codegraph wiring stayed global, not project-local" \
 # the stored decision rather than that the command was called: `telemetry off`
 # writes "enabled": false with "consent_source": "cli", and only the file proves
 # it stuck. A machine that somehow re-enabled it fails here.
-check "codegraph telemetry is off" \
-      "$(cat <<'CGTELEM'
+read -r -d '' CG_TELEM_CHECK <<'CGTELEM' || true
       python3 - <<'PY'
 import json, os, sys
 try:
@@ -544,7 +619,7 @@ except (OSError, ValueError):
 sys.exit(0 if data.get("enabled") is False else 1)
 PY
 CGTELEM
-)"
+check "codegraph telemetry is off" "$CG_TELEM_CHECK"
 
 # ------------------------------------------------------------------
 if $IS_MACOS; then
@@ -552,7 +627,21 @@ section "macOS extras"
 check "homebrew"          "command -v brew"
 check "ghostty app"       "[ -d /Applications/Ghostty.app ]"
 check "ghostty config"    "[ -L $HOME/.config/ghostty/config ]"
-check "powerline font"    "brew list --cask font-roboto-mono-for-powerline"
+# Ghostty exports TERM=xterm-ghostty and ships that terminfo only inside its
+# app bundle. Until it is installed, tmux exits the moment it attaches -
+# "missing or unsuitable terminal: xterm-ghostty" - while `tmux new-session -d`
+# keeps working, so it looks like tmux is broken rather than terminfo missing.
+# Ask ncurses to resolve the name, which is the lookup that actually has to
+# succeed; testing for ~/.terminfo would pass on an empty directory.
+check "xterm-ghostty terminfo resolves" "infocmp xterm-ghostty"
+# The font files, not the cask receipt. `brew list --cask` answers "is this
+# cask recorded as installed", which says nothing about whether the terminal
+# can find the face it is configured to use - and both terminals name the Nerd
+# Font build, which this check did not mention at all.
+check "nerd font files in ~/Library/Fonts" \
+      "ls $HOME/Library/Fonts/RobotoMonoNerdFont*.ttf >/dev/null 2>&1"
+check "powerline font files in ~/Library/Fonts" \
+      "ls $HOME/Library/Fonts/Roboto*Powerline*.ttf >/dev/null 2>&1"
 fi
 
 # ------------------------------------------------------------------

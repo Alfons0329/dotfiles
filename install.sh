@@ -147,6 +147,14 @@ for module_file in "${MODULE_FILES[@]}"; do
 
     printf '\n%s=== %s ===%s\n' "$C_GRN" "$name" "$C_OFF"
 
+    # Re-resolve Homebrew's PATH between modules. Modules run in subshells, so
+    # the `eval "$(brew shellenv)"` that 00-packages.sh does after installing
+    # Homebrew cannot reach module 10 onwards on its own - see brew_env() in
+    # lib/core.sh for what that silently cost on a fresh Mac. Doing it here, in
+    # the orchestrator's own process, is what makes the PATH stick for every
+    # module that follows.
+    brew_env
+
     # Modules run in a subshell: one module blowing up cannot corrupt the
     # orchestrator's state, and `set -e` inside a module stays scoped to it.
     # shellcheck source=/dev/null  # module path is resolved at runtime
