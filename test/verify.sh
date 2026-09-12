@@ -31,6 +31,11 @@ check() {
     fi
 }
 
+# Not every check is meaningful on every machine. Printing a [skip] line keeps
+# that visible instead of letting a check quietly pass on an empty set, which is
+# the failure mode CLAUDE.md warns about.
+skip_check() { printf '  %s[skip]%s %s\n' "$D" "$N" "$1"; }
+
 section() { printf '\n%s== %s ==%s\n' "$Y" "$1" "$N"; }
 
 # ------------------------------------------------------------------
@@ -620,6 +625,140 @@ sys.exit(0 if data.get("enabled") is False else 1)
 PY
 CGTELEM
 check "codegraph telemetry is off" "$CG_TELEM_CHECK"
+
+# ------------------------------------------------------------------
+section "cmux"
+# ------------------------------------------------------------------
+# cmux itself is macOS-only, but the keymap it gets is rendered by a shell
+# function in modules/65-cmux.sh, so the block can be checked anywhere -
+# including inside the Linux Docker build, which is this repo's actual pass/fail
+# signal. Worth doing there, because the two ways this keymap goes silently
+# wrong are a duplicate chord and a stroke cmux will not parse, and `cmux config
+# doctor` looks at neither: it validates JSONC syntax and lists top-level keys,
+# full stop. A wrong key is simply dropped, which presents as "that shortcut
+# does nothing" months later.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export REPO_ROOT
+
+read -r -d '' CMUX_BLOCK_CHECK <<'CMUXBLOCK' || true
+      bash -c 'source "$REPO_ROOT/modules/65-cmux.sh"; cmux_managed_block' | python3 -c '
+import json, re, sys
+
+text = sys.stdin.read()
+# Line-anchored, because every comment in that block starts its own line and
+# the only strings that could contain a slash pair do not. Deliberately not a
+# general JSONC parser: this checks a block this repo generates.
+text = re.sub(r"^\s*//.*$", "", text, flags=re.M)
+text = re.sub(r",(\s*[}\]])", r"\1", text)
+try:
+    data = json.loads("{" + text + "}")
+except ValueError as exc:
+    print("block is not parseable: %s" % exc)
+    sys.exit(1)
+
+bindings = data.get("shortcuts", {}).get("bindings", {})
+# A floor rather than a truthiness test: a function that returned an empty
+# object would otherwise pass every assertion below by having nothing to check.
+if len(bindings) < 20:
+    print("expected at least 20 bindings, found %d" % len(bindings))
+    sys.exit(1)
+
+if data.get("terminal", {}).get("copyOnSelect") is not True:
+    print("terminal.copyOnSelect is not true")
+    sys.exit(1)
+
+# The schema grammar, reduced to what this block uses. A literal % or $ - the
+# obvious thing to type - fails here, which is the point: cmux would take the
+# config, report it valid, and drop the binding.
+stroke = re.compile(
+    r"^(?:(?:cmd|command|shift|opt|option|alt|ctrl|control|ctl)\+)*"
+    r"(?:[A-Za-z0-9]|[,./\;=\[\]`" + chr(39) + r"-]|tab|return|enter|space"
+    r"|left|right|up|down)$"
+)
+
+seen = {}
+for action, combo in sorted(bindings.items()):
+    if not isinstance(combo, list) or len(combo) != 2:
+        print("%s is not a two-stroke chord: %r" % (action, combo))
+        sys.exit(1)
+    first, second = combo
+    if first != "ctrl+b":
+        print("%s does not start on the prefix: %r" % (action, first))
+        sys.exit(1)
+    if not stroke.match(second):
+        print("%s has a stroke cmux will not parse: %r" % (action, second))
+        sys.exit(1)
+    # The collision guard. Nothing upstream does this - cmux accepts two
+    # actions on one chord and one of them silently loses - and it is the same
+    # gap test/verify.sh covers for herdrs agent keys.
+    if second in seen:
+        print("%s and %s both want <prefix> %s" % (seen[second], action, second))
+        sys.exit(1)
+    seen[second] = action
+'
+CMUXBLOCK
+check "cmux keymap: parses, one prefix, no colliding chords" "$CMUX_BLOCK_CHECK"
+
+if $IS_MACOS; then
+CMUX_CONFIG="$HOME/.config/cmux/cmux.json"
+
+check "cmux installed"    "command -v cmux && cmux --version"
+# Ask cmux to read the deployed file rather than testing that the file exists:
+# a config it cannot parse is the failure that matters, and doctor also prints
+# the top-level keys it actually found.
+check "cmux accepts the deployed config" \
+      "cmux config doctor | grep -q 'JSONC syntax is valid'"
+check "cmux config carries the managed keys" \
+      "cmux config doctor | grep -E '^  keys:' | grep -q 'shortcuts' && cmux config doctor | grep -E '^  keys:' | grep -q 'terminal'"
+# The counterpart of the herdr check. cmux rewrites this file itself, so a
+# symlink into the repo would mean the app editing a tracked file in a public
+# checkout.
+check "cmux config is a real file, not a symlink into the repo" \
+      "[ -f $CMUX_CONFIG ] && [ ! -L $CMUX_CONFIG ]"
+check "cmux mouse selection copies" \
+      "grep -q '\"copyOnSelect\": true' $CMUX_CONFIG"
+
+# Does every action id we bind still exist in cmux's vocabulary? The app writes
+# a commented template into this same file listing every default binding as
+#   //       "actionId" : "cmd+t",
+# so that template is the local authority, and a release that renames an action
+# fails here instead of quietly dropping the key.
+#
+# Anchored to the commented form specifically. A bare grep for the id would
+# match our own managed block a few lines below and pass for the wrong reason -
+# failure mode 2 in CLAUDE.md, which has already cost this suite twice.
+read -r -d '' CMUX_IDS_CHECK <<'CMUXIDS' || true
+      python3 -c '
+import os, re, sys
+
+path = os.path.expanduser("~/.config/cmux/cmux.json")
+text = open(path).read()
+
+managed = re.search(r">>> dotfiles-managed.*?<<< dotfiles-managed", text, re.S)
+if not managed:
+    print("no managed block in %s" % path)
+    sys.exit(1)
+
+ours = set(re.findall(r"^\s*\"([A-Za-z]+)\": \[", managed.group(0), re.M))
+theirs = set(re.findall(r"^\s*//\s+\"([A-Za-z]+)\" : ", text, re.M))
+
+missing = sorted(ours - theirs)
+if missing:
+    print("not in cmuxs own default table: %s" % ", ".join(missing))
+    sys.exit(1)
+print("%d action ids confirmed against the template" % len(ours))
+'
+CMUXIDS
+# Only meaningful where cmux has written its template, which it does on first
+# launch and only when the file is absent. On a machine where install.sh
+# created the config before cmux ever ran, there is nothing to compare against
+# and saying so is better than a check that passes on an empty set.
+if grep -qE '^\s*//\s+"[A-Za-z]+" : ' "$CMUX_CONFIG" 2>/dev/null; then
+    check "cmux action ids still exist upstream" "$CMUX_IDS_CHECK"
+else
+    skip_check "cmux action ids: no app-written template in cmux.json to check against"
+fi
+fi
 
 # ------------------------------------------------------------------
 if $IS_MACOS; then

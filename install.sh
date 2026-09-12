@@ -43,6 +43,7 @@ Modules (in run order):
   herdr      herdr, an agent-aware multiplexer (does not replace tmux)
   codegraph  codegraph, wired into Claude Code as a global MCP server
   desktop    macOS only: fonts, terminal config, iTerm2 profile
+  cmux       macOS only: the tmux keymap and mouse-copy for cmux
   ghostty    macOS only: opt-in patched Ghostty build (asks first)
 
 Environment:

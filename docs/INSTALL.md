@@ -22,6 +22,7 @@ standalone script with its own `main()`.
 | `herdr` | herdr, an agent-aware multiplexer installed alongside tmux, plus its Claude Code integration |
 | `codegraph` | codegraph, wired into Claude Code as a global MCP server. Does not index anything — that is `codegraph init`, per repo |
 | `desktop` | macOS only: terminal, fonts, system monitor, iTerm2 profile |
+| `cmux` | macOS only: the tmux keymap and mouse-copy for cmux |
 | `ghostty` | macOS only: opt-in patched Ghostty build — asks first |
 
 Run one module, or skip some:
@@ -98,6 +99,56 @@ rewrites, leaving the notifier intact. `test/verify.sh`'s "Stop hook wired"
 check is the guard for that: if a future herdr release starts rewriting the
 file, notifications stop working with no other symptom, and that check is what
 notices.
+
+## cmux, and why its config is spliced rather than seeded
+
+`modules/65-cmux.sh` runs after `60-desktop.sh` because cmux is a Homebrew cask
+listed in `packages/brew-cask.txt`, and `install_casks` is what puts it on the
+machine; the module itself only writes configuration, and needs the CLI the cask
+ships to validate and reload it. It is macOS-only and skipped under `--minimal`,
+so the Docker build never sees it.
+
+What it writes is the tmux keymap — `<C-b>` as a two-stroke prefix, plus
+`terminal.copyOnSelect` — into `~/.config/cmux/cmux.json`. Three mechanisms were
+available and two of them are wrong here:
+
+- **A symlink**, as for `.tmux.conf.local` and the Ghostty config, cannot work:
+  cmux rewrites that file itself, which would mean the app editing a tracked
+  file in a public checkout.
+- **Seed once**, as for `~/.config/herdr/config.toml` above, is the mechanism
+  this one exists to avoid. `herdr-shortcut.md` records what it costs: a keymap
+  in a seeded template reaches a *new* machine and never an *existing* one, so
+  every box ends up with a different map and no page is right about all of them.
+- **Splice a managed block**, which is what it does. The block sits between two
+  `// >>> dotfiles-managed` markers and is re-rendered on every run; everything
+  else in the file — including the ~400-line commented template cmux writes on
+  first launch, which is the local documentation of every setting — survives
+  byte for byte.
+
+The parts that make re-running free, and that are the whole point:
+
+- the file is compared before it is written, so an unchanged run creates no
+  backup and reloads nothing;
+- a backup is taken only when something actually changes
+  (`cmux.json.bak.<timestamp>`, the format `cmux docs settings` asks for);
+- `cmux config doctor` is run afterwards, and the backup is restored if cmux
+  cannot read what was just written;
+- `cmux ping` decides whether a running app gets `cmux reload-config`, the same
+  way `modules/20-tmux.sh` re-sources a live tmux server.
+
+If the file already sets `shortcuts` or `terminal` *outside* the markers, the
+module refuses and leaves it alone. Two copies of one key parse fine and one of
+them silently loses, so per-machine values belong in cmux's own Settings UI,
+which this file overrides key by key.
+
+`cmux config doctor` validates JSONC syntax and lists top-level keys — it does
+**not** check that an action id exists or that two actions want the same chord,
+and a binding it cannot parse is dropped in silence. `test/verify.sh` covers
+both: it renders the block on any OS (so the Linux Docker build checks it too)
+and asserts every chord starts on the prefix, parses under the schema's key
+grammar and is unique; on macOS it also checks every action id against the
+default table cmux writes into that same file, anchored to the commented form so
+it cannot match our own block a few lines below.
 
 ## Neovim version pin
 

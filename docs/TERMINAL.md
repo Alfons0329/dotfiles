@@ -108,6 +108,11 @@ herdr, the agent-aware multiplexer installed alongside tmux, uses the same
 `<C-b>` prefix on purpose — but seven of the second keys differ from the table
 above. [herdr-shortcut.md](herdr-shortcut.md) is that diff.
 
+cmux, the third multiplexer on a Mac here, is given the same prefix by
+`modules/65-cmux.sh` — it ships with macOS Cmd shortcuts and no prefix at all,
+so this is a keymap rather than a diff, and it costs the Cmd keys it replaces.
+[cmux-shortcut.md](cmux-shortcut.md) is the map and the trade.
+
 These are **tmux** windows and panes — a layer above Neovim's tabs and splits.
 `<C-Tab>` cycles tmux's own windows, which is why it never reaches Neovim's
 tabs inside tmux; see [NEOVIM.md](NEOVIM.md) for the editor-side keys that do.
