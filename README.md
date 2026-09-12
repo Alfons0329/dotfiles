@@ -127,6 +127,7 @@ The README is the starting point; each subsystem has its own page:
 | **[docs/herdr-tmux-analogy.md](docs/herdr-tmux-analogy.md)** | herdr's model for a tmux user: workspace/tab/pane, agent state, and an ordinary day's workflow |
 | **[docs/herdr-shortcut.md](docs/herdr-shortcut.md)** | herdr keys as a diff against oh-my-tmux — the seven that differ, and why the prefix can look dead |
 | **[docs/herdr-loop-eng-tutorial.md](docs/herdr-loop-eng-tutorial.md)** | Running a staged, one-session-per-stage agent workflow on herdr instead of tmux windows |
+| **[docs/cmux-shortcut.md](docs/cmux-shortcut.md)** | cmux driven by the tmux keymap — the full map, and which Cmd keys it costs |
 
 ## Options
 
@@ -164,6 +165,7 @@ Modules run in this order, and each is also a standalone script:
 | `herdr` | herdr, an agent-aware multiplexer installed alongside tmux, not instead of it |
 | `codegraph` | codegraph, wired into Claude Code as a global MCP server |
 | `desktop` | macOS only: terminal, fonts, system monitor, iTerm2 profile |
+| `cmux` | macOS only: the tmux keymap and mouse-copy for cmux, spliced into its own config |
 | `ghostty` | macOS only: opt-in patched Ghostty build — asks first |
 
 ## What gets installed
@@ -222,6 +224,13 @@ cannot tell you when four agents are running at once. It is installed
 [docs/herdr-loop-eng-tutorial.md](docs/herdr-loop-eng-tutorial.md) covers
 running a staged workflow on it, and
 [docs/herdr-shortcut.md](docs/herdr-shortcut.md) the keys.
+
+On a Mac there is also [cmux](https://cmux.com), a third multiplexer that runs
+agents in workspaces on top of Ghostty. It ships with macOS Cmd shortcuts and no
+prefix; `modules/65-cmux.sh` gives it the same `<C-b>` map as tmux and herdr, and
+turns on copy-on-select so the mouse behaves the way it does in the other two.
+That trade — the Cmd keys it costs — is
+[docs/cmux-shortcut.md](docs/cmux-shortcut.md).
 
 And [codegraph](https://github.com/colbymchenry/codegraph), a pre-indexed code
 graph wired into Claude Code as a global MCP server, so an agent can ask for a
@@ -344,6 +353,13 @@ herdr needs nothing: type `herdr` to enter it. Its config was seeded once to
 change in this repo will not reach a machine that already has the file. Keys are
 [docs/herdr-shortcut.md](docs/herdr-shortcut.md); the mental model, if you are
 coming from tmux, is [docs/herdr-tmux-analogy.md](docs/herdr-tmux-analogy.md).
+
+cmux is the opposite arrangement, deliberately: its keymap lives in a managed
+block that `./install.sh --only cmux` **rewrites on every run**, so a change in
+this repo reaches a machine that already has the file. Everything outside the
+two markers in `~/.config/cmux/cmux.json` is left alone, an unchanged run is a
+no-op, and a running cmux picks the keys up without a restart. Keys and the
+Cmd-shortcut trade are [docs/cmux-shortcut.md](docs/cmux-shortcut.md).
 
 ## Credits
 

@@ -17,3 +17,9 @@ font-roboto-mono-for-powerline
 
 # menu-bar system monitor
 stats
+
+# cmux: a multiplexer built on Ghostty that runs coding agents in workspaces.
+# Installed here rather than by modules/65-cmux.sh so that module can stay a
+# config module - it only writes the keymap, and needs the CLI this cask ships
+# to validate and reload it.
+cmux
