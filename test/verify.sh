@@ -356,7 +356,8 @@ case "$DOTFILES_THEME" in
 esac
 
 for plugin in snacks.nvim lualine.nvim bufferline.nvim \
-              nvim-autopairs gitsigns.nvim nvim-treesitter nvim-lspconfig \
+              nvim-autopairs gitsigns.nvim nvim-treesitter \
+              nvim-treesitter-context nvim-lspconfig \
               blink.cmp mason.nvim copilot.lua; do
     check "plugin: $plugin" "[ -d $HOME/.local/share/nvim/lazy/$plugin ]"
 done
@@ -392,6 +393,53 @@ check "treesitter highlights a real buffer" \
 # fetches the rest on demand is switched on.
 check "treesitter auto_install enabled" \
       "grep -q 'auto_install = true' $HOME/.config/nvim/lua/plugins/editor.lua"
+
+# Sticky scroll, asserted by scrolling. The context window only exists once a
+# real buffer is parsed AND the cursor sits inside a node taller than the
+# screen, so nothing short of opening a file and moving the cursor exercises
+# it - and the failure mode is a plugin that loads fine and simply never draws
+# (no parser for the language, or `mode`/`max_lines` set so nothing qualifies).
+# The float is found by its content, not its existence: snacks and blink also
+# open floats.
+read -r -d '' TS_CONTEXT_CHECK <<'TSCTX' || true
+      (
+        _d="$(mktemp -d)"
+        {
+          echo "local M = {}"
+          echo ""
+          echo "function M.probe_function(arg)"
+          i=1
+          while [ "$i" -le 60 ]; do echo "    local x$i = $i"; i=$((i + 1)); done
+          echo "    return arg"
+          echo "end"
+          echo ""
+          echo "return M"
+        } > "$_d/probe.lua"
+        _out="$(nvim --headless "$_d/probe.lua" -c 'normal! 40G' -c 'lua
+          local found = false
+          vim.wait(3000, function()
+            for _, w in ipairs(vim.api.nvim_list_wins()) do
+              if vim.api.nvim_win_get_config(w).relative ~= "" then
+                local buf = vim.api.nvim_win_get_buf(w)
+                local first = (vim.api.nvim_buf_get_lines(buf, 0, 1, false))[1] or ""
+                if first:find("probe_function", 1, true) then found = true end
+              end
+            end
+            return found
+          end, 100)
+          io.write(tostring(found))' -c qa 2>&1)"
+        rm -rf "$_d"
+        case "$_out" in *true*) exit 0 ;; *) exit 1 ;; esac
+      )
+TSCTX
+check "sticky scroll pins the enclosing function" "$TS_CONTEXT_CHECK"
+
+# gitsigns owns `[c`, the key the plugin's own README suggests. Assert the two
+# are on different keys rather than that either exists: one owner per key is
+# the rule that keeps this config predictable, and a second claimant would win
+# or lose silently depending on load order.
+check "sticky-scroll jump did not take gitsigns' [c" \
+      "! grep -q '\"\\[c\"' $HOME/.config/nvim/lua/plugins/editor.lua"
 
 # lazy-loads on VeryLazy, which does not fire under --headless; force it so the
 # assertion is deterministic rather than a race.

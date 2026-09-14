@@ -191,7 +191,10 @@ explorer, indent guides, terminal, lazygit, symbol highlighting),
 [bufferline](https://github.com/akinsho/bufferline.nvim),
 [gitsigns](https://github.com/lewis6991/gitsigns.nvim),
 [nvim-autopairs](https://github.com/windwp/nvim-autopairs),
-[treesitter](https://github.com/nvim-treesitter/nvim-treesitter), native LSP via
+[treesitter](https://github.com/nvim-treesitter/nvim-treesitter) +
+[treesitter-context](https://github.com/nvim-treesitter/nvim-treesitter-context)
+(sticky scroll: the enclosing function stays pinned to the top of the window),
+native LSP via
 [nvim-lspconfig](https://github.com/neovim/nvim-lspconfig) +
 [mason](https://github.com/williamboman/mason.nvim), completion via
 [blink.cmp](https://github.com/saghen/blink.cmp), and
