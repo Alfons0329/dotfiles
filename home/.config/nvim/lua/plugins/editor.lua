@@ -155,6 +155,50 @@ return {
     },
 
     {
+        -- Sticky scroll, VSCode's name for it: the enclosing function, class or
+        -- branch stays pinned to the top of the window while you scroll through
+        -- a body taller than the screen. Kept next to nvim-treesitter rather
+        -- than in plugins/ui.lua because it renders from the same parse tree -
+        -- a language with no parser installed simply shows no context, and
+        -- `auto_install` above is what fixes that.
+        "nvim-treesitter/nvim-treesitter-context",
+        dependencies = { "nvim-treesitter/nvim-treesitter" },
+        event = { "BufReadPost", "BufNewFile" },
+        opts = {
+            -- Three lines is the point where this stops paying for itself. The
+            -- context window overlays the top of the buffer rather than adding
+            -- height to it, so every line it draws is a line of code you can no
+            -- longer see; an outer class plus a method plus an `if` would
+            -- otherwise cover a quarter of a short split.
+            max_lines = 3,
+
+            -- One line per level. The default 20 lets a single wrapped function
+            -- signature - the norm in Go and TypeScript - spend five lines
+            -- saying what its first line already says.
+            multiline_threshold = 1,
+
+            -- Context for where the cursor is, not where the viewport starts.
+            -- With "topline" the header changes as you scroll past a function
+            -- you are not in, which is exactly when it is most distracting.
+            mode = "cursor",
+
+            -- Drop the outermost frame first when max_lines is hit: the
+            -- innermost scope is the one you are editing.
+            trim_scope = "outer",
+        },
+        keys = {
+            -- Not `[c`, the plugin's suggested key: gitsigns owns that for
+            -- "previous git hunk" (plugins/ui.lua), and a second owner would
+            -- silently take it depending on load order.
+            {
+                "<leader>k",
+                function() require("treesitter-context").go_to_context(vim.v.count1) end,
+                desc = "Jump to enclosing context",
+            },
+        },
+    },
+
+    {
         -- Auto-closing brackets and quotes, as VSCode does by default.
         "windwp/nvim-autopairs",
         event = "InsertEnter",

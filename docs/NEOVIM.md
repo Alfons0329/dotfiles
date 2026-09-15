@@ -174,6 +174,8 @@ of mistake as two plugins fighting over the statusline.
 | `Tab`/`Shift+Tab` (indent) | `>` / `<` | indent, keeps the selection |
 | paste over | `<leader>p` | paste without losing your yank register |
 | `Ctrl+S` | `<C-s>` or `<leader>w` | save |
+| sticky scroll | automatic | the enclosing function/class/`if` stays pinned to the top of the window |
+| click the sticky line | `<leader>k` | jump up to the context line (`3<leader>k` for the third one out) |
 
 ## Git
 
@@ -233,6 +235,10 @@ When a picker (`<leader>ff`, `<leader>fg`, …) is open:
   `:lua require('blink.cmp').setup({ sources = { default = { 'lsp', 'path', 'snippets' } } })`.
   (Session-only; drops just the fuzzy `buffer` source.) Ask if you want a
   permanent `<leader>ct` toggle wired in.
+- **Sticky scroll eating the screen?** It draws over the top of the buffer
+  rather than adding height, so it is capped at 3 lines, one per nesting level.
+  `:TSContext toggle` turns it off for the session; the jump key is
+  `<leader>k`, not the plugin's suggested `[c` — gitsigns owns that for hunks.
 - **Want a real replace UI later?** The native `:%s` / `:cdo` flow above covers
   it, but if you'd rather have VSCode's find-and-replace panel, look at
   `grug-far.nvim`. Not installed by default to keep the plugin set lean.

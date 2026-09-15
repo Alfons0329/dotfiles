@@ -127,7 +127,7 @@ The README is the starting point; each subsystem has its own page:
 | **[docs/herdr-tmux-analogy.md](docs/herdr-tmux-analogy.md)** | herdr's model for a tmux user: workspace/tab/pane, agent state, and an ordinary day's workflow |
 | **[docs/herdr-shortcut.md](docs/herdr-shortcut.md)** | herdr keys as a diff against oh-my-tmux — the seven that differ, and why the prefix can look dead |
 | **[docs/herdr-loop-eng-tutorial.md](docs/herdr-loop-eng-tutorial.md)** | Running a staged, one-session-per-stage agent workflow on herdr instead of tmux windows |
-| **[docs/cmux-shortcut.md](docs/cmux-shortcut.md)** | cmux driven by the tmux keymap — the full map, and which Cmd keys it costs |
+| **[docs/cmux-shortcut.md](docs/cmux-shortcut.md)** | cmux driven by the tmux keymap — the full map, which Cmd keys it costs, and session-named agent notification banners |
 
 ## Options
 
@@ -191,7 +191,10 @@ explorer, indent guides, terminal, lazygit, symbol highlighting),
 [bufferline](https://github.com/akinsho/bufferline.nvim),
 [gitsigns](https://github.com/lewis6991/gitsigns.nvim),
 [nvim-autopairs](https://github.com/windwp/nvim-autopairs),
-[treesitter](https://github.com/nvim-treesitter/nvim-treesitter), native LSP via
+[treesitter](https://github.com/nvim-treesitter/nvim-treesitter) +
+[treesitter-context](https://github.com/nvim-treesitter/nvim-treesitter-context)
+(sticky scroll: the enclosing function stays pinned to the top of the window),
+native LSP via
 [nvim-lspconfig](https://github.com/neovim/nvim-lspconfig) +
 [mason](https://github.com/williamboman/mason.nvim), completion via
 [blink.cmp](https://github.com/saghen/blink.cmp), and

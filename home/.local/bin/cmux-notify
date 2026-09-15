@@ -1,0 +1,106 @@
+#!/bin/sh
+# macOS banner for a cmux agent event, titled with the cmux session name.
+#
+# Wired up as notifications.command in ~/.config/cmux/cmux.json, where cmux
+# runs it once per delivered notification with exactly three variables set and
+# nothing on stdin or argv (probed against a live agent event - the documented
+# CMUX_NOTIFICATION_AGENT_* variables are not set by this build):
+#
+#   CMUX_NOTIFICATION_TITLE=Claude Code
+#   CMUX_NOTIFICATION_SUBTITLE=Completed in example-app   # or "Waiting"
+#   CMUX_NOTIFICATION_BODY=<the agent's last message>
+#
+# This exists because cmux's own banner cannot say the session name: its
+# subtitle is the workspace's project directory (example-app), not the
+# workspace/session title (EX-1234), and nothing in the payload carries the
+# name. The name comes back out of `cmux list-notifications`, whose last field
+# is `pct:<session name>`.
+#
+# The banner text is untrusted - it is whatever an agent last printed, and can
+# come from an SSH relay or a cloud machine. It is passed to osascript as
+# `on run argv` arguments, never interpolated into the AppleScript source, so a
+# body containing a quote or a bracket is data rather than code. Building the
+# source string is the one thing cmux's own docs tell you not to do.
+set -u
+
+DRY=0
+[ "${1-}" = "--dry-run" ] && DRY=1
+[ "${CMUX_NOTIFY_DRY_RUN-0}" = "1" ] && DRY=1
+
+title=${CMUX_NOTIFICATION_TITLE-}
+subtitle=${CMUX_NOTIFICATION_SUBTITLE-}
+body=${CMUX_NOTIFICATION_BODY-}
+
+# Nothing to say. Exit 0: a non-zero exit here would show up as a cmux hook
+# failure alert, which is noisier than the notification it replaced.
+[ -n "$title$subtitle" ] || exit 0
+
+# The state is only legible in the subtitle. cmux's three agent categories
+# (turn-complete, needs-permission, idle-reminder) reach this process already
+# rendered into English prose, so this maps the prose rather than a category id.
+case $subtitle in
+    Completed*)             state="completed" ;;
+    Waiting*|Idle*)         state="needs input" ;;
+    Permission*|Approval*)  state="needs permission" ;;
+    Error*|Stalled*|Failed*) state="stalled" ;;
+    "")                     state="$title" ;;
+    *)                      state=$(printf '%s' "$subtitle" | tr 'A-Z' 'a-z') ;;
+esac
+
+# The session name, best source first.
+#
+# 1. The newest notification record, which carries it as its last field. Guarded
+#    by a title match so a stale row - the record list is not strictly the row
+#    being delivered - falls through instead of naming the wrong session.
+# 2. The trailing word of "Completed in <project>", which is the project
+#    directory rather than the session, but is at least about this event.
+# 3. The title cmux sent.
+name=""
+if [ "$DRY" -eq 0 ]; then
+    # cmux runs this with PATH=/usr/bin:/bin:/usr/sbin:/sbin and none of its
+    # own variables beyond the three above, so `command -v cmux` finds nothing
+    # here and the bundle path is the one that actually resolves. Both earlier
+    # branches are for a terminal that has a richer environment - the dry run
+    # in test/verify.sh, and running it by hand.
+    cmux_bin=${CMUX_BUNDLED_CLI_PATH-}
+    if [ -z "$cmux_bin" ] || [ ! -x "$cmux_bin" ]; then
+        cmux_bin=$(command -v cmux 2>/dev/null || true)
+    fi
+    [ -n "$cmux_bin" ] || cmux_bin=/Applications/cmux.app/Contents/Resources/bin/cmux
+    if [ -x "$cmux_bin" ]; then
+        row=$("$cmux_bin" list-notifications 2>/dev/null | head -1)
+        # Last field, not field 9: a body containing a `|` shifts every field
+        # after it, and the body is agent output.
+        last=$(printf '%s' "$row" | awk -F'|' '{print $NF}')
+        row_title=$(printf '%s' "$row" | awk -F'|' '{print $5}')
+        case $last in
+            pct:?*) [ "$row_title" = "$title" ] && name=${last#pct:} ;;
+        esac
+    fi
+fi
+[ -n "$name" ] || case $subtitle in
+    *" in "*) name=${subtitle##* in } ;;
+esac
+[ -n "$name" ] || name=$title
+[ -n "$name" ] || name="cmux"
+
+# Control characters only. Not a length cap: cmux already caps bodies at 1 KiB,
+# and cutting to a byte count would split a multi-byte character - agent output
+# here is routinely CJK - leaving osascript holding invalid UTF-8.
+body=$(printf '%s' "$body" | tr -d '\000-\010\013\014\016-\037')
+[ -n "$body" ] || body=$state
+
+if [ "$DRY" -eq 1 ]; then
+    printf '%s|%s|%s\n' "$name" "$state" "$body"
+    exit 0
+fi
+
+# No `sound name` here on purpose. cmux still owns the sound (its hook mutes
+# only the banner), so it stays configurable per state in cmux.json via
+# notifications.soundOverrides, and it keeps following Do Not Disturb.
+osascript - "$name" "$state" "$body" <<'APPLESCRIPT' >/dev/null 2>&1
+on run argv
+    display notification (item 3 of argv) with title (item 1 of argv) subtitle (item 2 of argv)
+end run
+APPLESCRIPT
+exit 0

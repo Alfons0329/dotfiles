@@ -356,7 +356,8 @@ case "$DOTFILES_THEME" in
 esac
 
 for plugin in snacks.nvim lualine.nvim bufferline.nvim \
-              nvim-autopairs gitsigns.nvim nvim-treesitter nvim-lspconfig \
+              nvim-autopairs gitsigns.nvim nvim-treesitter \
+              nvim-treesitter-context nvim-lspconfig \
               blink.cmp mason.nvim copilot.lua; do
     check "plugin: $plugin" "[ -d $HOME/.local/share/nvim/lazy/$plugin ]"
 done
@@ -392,6 +393,53 @@ check "treesitter highlights a real buffer" \
 # fetches the rest on demand is switched on.
 check "treesitter auto_install enabled" \
       "grep -q 'auto_install = true' $HOME/.config/nvim/lua/plugins/editor.lua"
+
+# Sticky scroll, asserted by scrolling. The context window only exists once a
+# real buffer is parsed AND the cursor sits inside a node taller than the
+# screen, so nothing short of opening a file and moving the cursor exercises
+# it - and the failure mode is a plugin that loads fine and simply never draws
+# (no parser for the language, or `mode`/`max_lines` set so nothing qualifies).
+# The float is found by its content, not its existence: snacks and blink also
+# open floats.
+read -r -d '' TS_CONTEXT_CHECK <<'TSCTX' || true
+      (
+        _d="$(mktemp -d)"
+        {
+          echo "local M = {}"
+          echo ""
+          echo "function M.probe_function(arg)"
+          i=1
+          while [ "$i" -le 60 ]; do echo "    local x$i = $i"; i=$((i + 1)); done
+          echo "    return arg"
+          echo "end"
+          echo ""
+          echo "return M"
+        } > "$_d/probe.lua"
+        _out="$(nvim --headless "$_d/probe.lua" -c 'normal! 40G' -c 'lua
+          local found = false
+          vim.wait(3000, function()
+            for _, w in ipairs(vim.api.nvim_list_wins()) do
+              if vim.api.nvim_win_get_config(w).relative ~= "" then
+                local buf = vim.api.nvim_win_get_buf(w)
+                local first = (vim.api.nvim_buf_get_lines(buf, 0, 1, false))[1] or ""
+                if first:find("probe_function", 1, true) then found = true end
+              end
+            end
+            return found
+          end, 100)
+          io.write(tostring(found))' -c qa 2>&1)"
+        rm -rf "$_d"
+        case "$_out" in *true*) exit 0 ;; *) exit 1 ;; esac
+      )
+TSCTX
+check "sticky scroll pins the enclosing function" "$TS_CONTEXT_CHECK"
+
+# gitsigns owns `[c`, the key the plugin's own README suggests. Assert the two
+# are on different keys rather than that either exists: one owner per key is
+# the rule that keeps this config predictable, and a second claimant would win
+# or lose silently depending on load order.
+check "sticky-scroll jump did not take gitsigns' [c" \
+      "! grep -q '\"\\[c\"' $HOME/.config/nvim/lua/plugins/editor.lua"
 
 # lazy-loads on VeryLazy, which does not fire under --headless; force it so the
 # assertion is deterministic rather than a race.
@@ -667,6 +715,17 @@ if data.get("terminal", {}).get("copyOnSelect") is not True:
     print("terminal.copyOnSelect is not true")
     sys.exit(1)
 
+# toggleSidebar is cmux own left sidebar, not a tmux stand-in, and it is the
+# one action this module deliberately leaves off the prefix - see the comment
+# on it in cmux_managed_block(). Checked by value rather than skipped, so a
+# future edit that quietly moves it back onto ctrl+b (as one earlier version
+# of this file did, to "b") is a parse failure here, not a silent regression
+# a human has to notice by hand on a real keyboard.
+if bindings.get("toggleSidebar") != "cmd+b":
+    print("toggleSidebar is %r, expected the bare string 'cmd+b'" % bindings.get("toggleSidebar"))
+    sys.exit(1)
+bindings = {k: v for k, v in bindings.items() if k != "toggleSidebar"}
+
 # The schema grammar, reduced to what this block uses. A literal % or $ - the
 # obvious thing to type - fails here, which is the point: cmux would take the
 # config, report it valid, and drop the binding.
@@ -709,7 +768,7 @@ check "cmux installed"    "command -v cmux && cmux --version"
 check "cmux accepts the deployed config" \
       "cmux config doctor | grep -q 'JSONC syntax is valid'"
 check "cmux config carries the managed keys" \
-      "cmux config doctor | grep -E '^  keys:' | grep -q 'shortcuts' && cmux config doctor | grep -E '^  keys:' | grep -q 'terminal'"
+      "cmux config doctor | grep -E '^  keys:' | grep -q 'shortcuts' && cmux config doctor | grep -E '^  keys:' | grep -q 'terminal' && cmux config doctor | grep -E '^  keys:' | grep -q 'notifications'"
 # The counterpart of the herdr check. cmux rewrites this file itself, so a
 # symlink into the repo would mean the app editing a tracked file in a public
 # checkout.
@@ -758,6 +817,98 @@ if grep -qE '^\s*//\s+"[A-Za-z]+" : ' "$CMUX_CONFIG" 2>/dev/null; then
 else
     skip_check "cmux action ids: no app-written template in cmux.json to check against"
 fi
+
+# Agent notification banners. cmux runs notifications.command once per
+# delivered notification with three variables and nothing else - no argv, no
+# stdin - so the whole path is invisible when it breaks: a missing script, a
+# hook that prints something other than JSON, or a renamed record field all
+# end in "no banner" with nothing logged.
+check "cmux-notify is on PATH and executable" "[ -x $HOME/.local/bin/cmux-notify ]"
+
+# cmux hands notifications.command a PATH of /usr/bin:/bin:/usr/sbin:/sbin and
+# none of its own variables, so `command -v cmux` finds nothing in there and
+# cmux-notify falls back to the bundle path to look the session name up. If
+# that path ever moves, the banner keeps working and quietly loses the name.
+check "the cmux CLI cmux-notify falls back to exists" \
+      "[ -x /Applications/cmux.app/Contents/Resources/bin/cmux ]"
+
+# Behaviour, not presence. The mapping from cmux's English subtitles to a
+# state is the whole job, and the third case is the security-relevant one: the
+# body is agent output, so a command substitution in it has to come back out
+# as literal text rather than having run.
+read -r -d '' CMUX_NOTIFY_CHECK <<'CMUXNOTIFY' || true
+      (
+        out=$(CMUX_NOTIFICATION_TITLE="Claude Code" \
+              CMUX_NOTIFICATION_SUBTITLE="Completed in demo-project" \
+              CMUX_NOTIFICATION_BODY="done" \
+              "$HOME/.local/bin/cmux-notify" --dry-run)
+        [ "$out" = "demo-project|completed|done" ] || exit 1
+
+        out=$(CMUX_NOTIFICATION_TITLE="Claude Code" \
+              CMUX_NOTIFICATION_SUBTITLE="Waiting" \
+              CMUX_NOTIFICATION_BODY="" \
+              "$HOME/.local/bin/cmux-notify" --dry-run)
+        [ "$out" = "Claude Code|needs input|needs input" ] || exit 1
+
+        out=$(CMUX_NOTIFICATION_TITLE="Claude Code" \
+              CMUX_NOTIFICATION_SUBTITLE="Waiting" \
+              CMUX_NOTIFICATION_BODY='said "hi" $(echo pwned)' \
+              "$HOME/.local/bin/cmux-notify" --dry-run)
+        [ "$out" = 'Claude Code|needs input|said "hi" $(echo pwned)' ] || exit 1
+      )
+CMUXNOTIFY
+check "cmux-notify maps agent states onto a session banner" "$CMUX_NOTIFY_CHECK"
+
+# cmux.json has to name the script, and the hook has to return JSON that turns
+# the native banner off - cmux discards a hook that returns anything else and
+# silently reverts to its default behaviour, which is two banners per event.
+# The comment stripper is line-anchored only, not string-aware: it is enough
+# for a file this module writes, because cmux_managed_block() never puts a
+# comment after code on the same line, and neither does cmux's own template.
+read -r -d '' CMUX_HOOK_CHECK <<'CMUXHOOK' || true
+      python3 -c '
+import json, re, subprocess, sys
+
+text = open("'"$CMUX_CONFIG"'").read()
+text = re.sub(r"^\s*//.*$", "", text, flags=re.M)
+text = re.sub(r",(\s*[}\]])", r"\1", text)
+cfg = json.loads(text)
+notif = cfg["notifications"]
+if "cmux-notify" not in notif.get("command", ""):
+    sys.exit(1)
+
+hooks = [h for h in notif.get("hooks", []) if h.get("enabled", True)]
+if not hooks:
+    sys.exit(1)
+
+muted = False
+for hook in hooks:
+    proc = subprocess.run(["/bin/sh", "-c", hook["command"]],
+                          input=b"{}", capture_output=True)
+    out = proc.stdout.strip()
+    if not out:
+        continue
+    patch = json.loads(out)   # not JSON -> raises -> the check fails, as cmux would
+    if patch.get("effects", {}).get("desktop") is False:
+        muted = True
+
+sys.exit(0 if muted else 1)
+'
+CMUXHOOK
+check "cmux hands the banner to cmux-notify and mutes its own" "$CMUX_HOOK_CHECK"
+
+# The lookup in cmux-notify reads the session name out of the last field of a
+# notification record, which is the one part of this that is not documented
+# anywhere. Skipped rather than failed on a machine that has not collected a
+# notification yet - a fresh install has an empty list.
+read -r -d '' CMUX_RECORD_CHECK <<'CMUXRECORD' || true
+      (
+        rows=$(cmux list-notifications 2>/dev/null) || exit 0
+        [ -n "$rows" ] || exit 0
+        printf '%s\n' "$rows" | head -1 | awk -F'|' '{print $NF}' | grep -q '^pct:'
+      )
+CMUXRECORD
+check "cmux notification records still carry the session name" "$CMUX_RECORD_CHECK"
 fi
 
 # ------------------------------------------------------------------
@@ -766,6 +917,24 @@ section "macOS extras"
 check "homebrew"          "command -v brew"
 check "ghostty app"       "[ -d /Applications/Ghostty.app ]"
 check "ghostty config"    "[ -L $HOME/.config/ghostty/config ]"
+
+# Drag-select must land in the system clipboard, not just a selection clipboard
+# that macOS does not have and Linux does. Asked of Ghostty rather than grepped
+# out of the config file: the comment next to the setting spells out the value
+# it replaced, and `+show-config --changes-only=false` prints the *effective*
+# value after every config-file and `config-file = ?...` include is resolved -
+# which is the thing that has to be `clipboard`.
+read -r -d '' GHOSTTY_COS_CHECK <<'GCOS' || true
+      (
+        gb=$(command -v ghostty 2>/dev/null || true)
+        [ -n "$gb" ] || gb=/Applications/Ghostty.app/Contents/MacOS/ghostty
+        [ -x "$gb" ] || exit 1
+        "$gb" +show-config --changes-only=false --no-pager 2>/dev/null \
+            | grep -qx 'copy-on-select = clipboard'
+      )
+GCOS
+check "ghostty copies a selection to the system clipboard" "$GHOSTTY_COS_CHECK"
+
 # Ghostty exports TERM=xterm-ghostty and ships that terminfo only inside its
 # app bundle. Until it is installed, tmux exits the moment it attaches -
 # "missing or unsuitable terminal: xterm-ghostty" - while `tmux new-session -d`

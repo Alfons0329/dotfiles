@@ -32,6 +32,21 @@ macos-option-as-alt = true
 # single Neovim mapping serves the Mac and the Linux build box.
 keybind = cmd+shift+f=text:\x1bF
 
+# Mouse and selection
+#
+# Drag-select puts the text in the clipboard with no keystroke, which is what
+# herdr does by default (ui.copy_on_select = true) and the behaviour the muscle
+# memory is built on. `clipboard` rather than `true`: Ghostty's `true` means
+# "prefer the selection clipboard", so it only reaches the system clipboard on
+# a platform that has no selection clipboard. That is true of macOS by accident
+# and false on the Linux build box, where a drag-select could be middle-click
+# pasted into another terminal but never Cmd/Ctrl+V'd into anything else.
+# `clipboard` writes both, so the same drag means the same thing on both
+# machines. cmux states the same intent for its own panes via
+# terminal.copyOnSelect in the managed block modules/65-cmux.sh writes into
+# ~/.config/cmux/cmux.json.
+copy-on-select = clipboard
+
 # Scrollback
 scrollback-limit = 10000
 

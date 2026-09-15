@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# modules/65-cmux.sh - give cmux the tmux keymap, and make its mouse selection
-# copy the way tmux's and herdr's do.
+# modules/65-cmux.sh - give cmux the tmux keymap, make its mouse selection copy
+# the way tmux's and herdr's do, and put a session-named macOS banner on an
+# agent's turn instead of cmux's own workspace-named one.
 #
 # Numbered after 60-desktop.sh, not next to 20-tmux.sh, even though cmux is a
 # multiplexer: cmux is a Homebrew *cask* listed in packages/brew-cask.txt, so
@@ -20,6 +21,8 @@ fi
 
 CMUX_CONFIG_DIR="$HOME/.config/cmux"
 CMUX_CONFIG="$CMUX_CONFIG_DIR/cmux.json"
+CMUX_NOTIFY_SRC="$HOME_SRC/.local/bin/cmux-notify"
+CMUX_NOTIFY_DST="$HOME/.local/bin/cmux-notify"
 
 # ------------------------------------------------------------------
 # The managed block: a JSONC fragment spliced into ~/.config/cmux/cmux.json
@@ -42,9 +45,10 @@ CMUX_CONFIG="$CMUX_CONFIG_DIR/cmux.json"
 #
 # A cmux action holds exactly ONE binding - the schema's shortcuts.bindings is
 # a string or a two-stroke chord array, never a list of alternatives - so every
-# chord below REPLACES that action's Cmd default. Cmd+T, Cmd+W, Cmd+N, Cmd+B,
-# Cmd+[ and Cmd+] stop firing in cmux as a result. That is the deliberate
-# trade: one keymap across tmux, herdr and cmux.
+# chord below REPLACES that action's Cmd default. Cmd+T, Cmd+W, Cmd+N, Cmd+[
+# and Cmd+] stop firing in cmux as a result. That is the deliberate trade: one
+# keymap across tmux, herdr and cmux. toggleSidebar below is the one
+# deliberate exception - see the comment on it.
 #
 # Keys with no literal spelling are written as their shifted form, because the
 # schema's key grammar accepts [A-Za-z0-9] and ,./\;'`=[]- and nothing else:
@@ -109,8 +113,13 @@ cmux_managed_block() {
       // '&' kills a *window*, which in this map is closeTab above, and a
       // chord that destroys a whole workspace is not one to add by analogy.
 
-      // b matches herdr's <prefix> b for the same sidebar-shaped thing.
-      "toggleSidebar": ["ctrl+b", "b"],
+      // The one action on this page kept off the prefix. toggleSidebar is
+      // cmux's own left sidebar - a real, separate shortcut, not a tmux
+      // stand-in - and tmux has no equivalent action to justify taking cmd+b
+      // away from it the way every other chord here takes a Cmd key. Kept as
+      // a single stroke, not a chord: the schema also accepts one bare key,
+      // which is what cmux's own default already is.
+      "toggleSidebar": "cmd+b",
       // The closest cmux has to tmux's copy-mode. The mouse half of this is
       // terminal.copyOnSelect below.
       "toggleTerminalCopyMode": ["ctrl+b", "["],
@@ -124,6 +133,49 @@ cmux_managed_block() {
     // true in `herdr --default-config`. cmux defaults it to false, which is
     // the one place the three tools disagree about the mouse.
     "copyOnSelect": true
+  },
+
+  // cmux already posts a macOS banner when an agent finishes a turn or needs
+  // input, but its subtitle is the workspace's project directory ("Completed
+  // in example-app"), never the session name ("EX-1234") - the name is not in
+  // the payload at all. The banner is handed to cmux-notify (deployed by this
+  // module to ~/.local/bin), which looks the name up over the cmux socket and
+  // posts "<session> / completed" or "<session> / needs input" through
+  // osascript instead.
+  //
+  // The hook mutes cmux's own banner so there is exactly one on screen, and
+  // mutes nothing else: the sidebar unread mark, the pane flash, the
+  // notification record and the sound all stay with cmux. Sound stays cmux's
+  // in particular so it is configurable per state below and still respects Do
+  // Not Disturb - osascript's `sound name` would not.
+  //
+  // Trade-off worth knowing: an osascript banner belongs to Script Editor, so
+  // clicking it does nothing, where cmux's own banner would have focused the
+  // pane. To go back to that, delete the hook; the command can stay either way.
+  "notifications": {
+    "sound": "Glass",
+    "soundOverrides": {
+      "claude": {
+        "turnDone": { "sound": "Glass" },
+        "needsInput": { "sound": "Sosumi" }
+      }
+    },
+
+    // A banner for a pane that is merely visible - a second agent in the same
+    // workspace - is otherwise withdrawn the moment the workspace is on
+    // screen, which is exactly when a second agent finishes unnoticed.
+    "suppressOnlyFocusedSurface": true,
+
+    // Run through a shell, so $HOME expands - cmux sets HOME but hands the
+    // command a PATH of just /usr/bin:/bin:/usr/sbin:/sbin.
+    "command": "$HOME/.local/bin/cmux-notify",
+    "hooks": [
+      {
+        "id": "osascript-owns-the-banner",
+        "command": "printf '{\"effects\":{\"desktop\":false}}'",
+        "timeoutSeconds": 5
+      }
+    ]
   }
 BLOCK
 }
@@ -242,7 +294,7 @@ except ValueError as exc:
     print("  leaving it alone; fix it or delete it and re-run")
     sys.exit(REFUSED)
 
-clashes = [k for k in ("shortcuts", "terminal") if k in data]
+clashes = [k for k in ("shortcuts", "terminal", "notifications") if k in data]
 if clashes:
     print("  %s already sets %s outside the managed block."
           % (path, " and ".join(clashes)))
@@ -353,6 +405,13 @@ main() {
         warn "  It comes from packages/brew-cask.txt via './install.sh --only desktop'."
         return 0
     fi
+
+    # Linked before configure_cmux writes notifications.command: that key
+    # names this script by path, so a config reload before the link exists
+    # runs nothing on the first agent notification. ~/.local/bin rather than a
+    # repo path - it is already first in .zshrc's PATH and is where every
+    # other shim in this repo lands.
+    link "$CMUX_NOTIFY_SRC" "$CMUX_NOTIFY_DST"
 
     # 10 is configure_cmux's "nothing to do", which is a success, not a failure.
     local rc=0

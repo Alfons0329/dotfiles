@@ -88,15 +88,24 @@ they are unbound there — a stale habit should do nothing rather than something
 
 | Keys | What it does | Was |
 | --- | --- | --- |
-| `<prefix> b` | toggle the sidebar — same key as herdr | `⌘B` |
 | `<prefix> [` | copy mode | `⌘⇧M` |
 | `<prefix> r` | reload cmux.json **and** the Ghostty config | `⌘⇧,` |
+
+`toggleSidebar` (cmux's own left sidebar) is deliberately **not** on this list.
+It stays on its native `⌘B` rather than moving to `<prefix> b` the way herdr's
+equivalent key would suggest: `⌘B` is a real, separate shortcut people reach
+for constantly, and losing it to a tmux-parity binding with no tmux default to
+justify it is a worse trade than leaving `<prefix> b` unbound.
 
 Mouse selection copies to the clipboard, which is `terminal.copyOnSelect` in the
 same managed block. tmux gets that from `set -g mouse on` plus the
 `MouseDragEnd1Pane` unbind in `~/.tmux.conf.local`, and herdr gets it for free —
 `copy_on_select = true` is already in `herdr --default-config`. cmux is the only
-one of the three that defaults it off.
+one of the three that defaults it off. Plain Ghostty, opened without cmux, gets
+the same behaviour from `copy-on-select = clipboard` in
+`~/.config/ghostty/config` directly — `clipboard` rather than Ghostty's own
+default of `true`, which only reaches the system clipboard on a platform with
+no separate selection clipboard (true of macOS by accident, false on Linux).
 
 ## What you give up
 
@@ -104,7 +113,7 @@ one of the three that defaults it off.
 takes a single shortcut *or* a two-stroke chord — never a list — so an action
 cannot answer to both. After this module runs, in cmux:
 
-- `⌘T`, `⌘W`, `⌘N`, `⌘B`, `⌘R`, `⌘D`, `⌘P` do nothing;
+- `⌘T`, `⌘W`, `⌘N`, `⌘R`, `⌘D`, `⌘P` do nothing;
 - `⌘[` and `⌘]` are free, which is a small win: cmux binds focus-back/forward to
   them by default, and that is what stops a terminal program inside cmux from
   ever seeing those keys.
@@ -180,6 +189,81 @@ being the frontmost app. `⌘,` → Keyboard Shortcuts shows cmux's live table,
 which is rendered from the config rather than from a built-in list, so it is the
 authority on what cmux thinks it has.
 
+## Agent notifications
+
+The banner an agent triggers says the **session** name, because that is the
+name you think in:
+
+```
+┌──────────────────────────────┐
+│ EX-1234                  now │   ← cmux workspace (session) name
+│ completed                    │   ← or "needs input"
+│ <the agent's last message>   │
+└──────────────────────────────┘
+```
+
+cmux posts its own banner for the same events, and it cannot say that. Its
+subtitle is the workspace's **project directory** — `Completed in example-app`
+— and the session name is nowhere in the payload. So the managed block hands
+the banner to `~/.local/bin/cmux-notify` (deployed by this module, source at
+`home/.local/bin/cmux-notify`), wired up as `notifications.command`:
+
+| Piece | Owner |
+| --- | --- |
+| banner text | `cmux-notify`, via `osascript` |
+| the ding | cmux (`notifications.sound`, `soundOverrides` per state) |
+| sidebar unread mark, pane flash, notification record | cmux |
+| cmux's own banner | muted by the `osascript-owns-the-banner` hook |
+
+Sound deliberately stays with cmux: it is configurable per state there
+(`Glass` on completion, `Sosumi` when an agent wants you), and it respects Do
+Not Disturb. `osascript`'s own `sound name` does not.
+
+**The cost:** an `osascript` banner belongs to Script Editor, so clicking it
+does nothing. cmux's own banner would have focused the pane. Delete the hook
+from `cmux_managed_block()` to get that back — you then get two banners per
+event, which is the other thing you can have but not both.
+
+### What cmux actually hands the script
+
+Three variables, no argv, no stdin — probed against a live agent event, not
+read off a doc:
+
+```
+CMUX_NOTIFICATION_TITLE=Claude Code
+CMUX_NOTIFICATION_SUBTITLE=Completed in example-app   # or "Waiting"
+CMUX_NOTIFICATION_BODY=<the agent's last message>
+```
+
+Two consequences the script is built around:
+
+- **The state is only in the subtitle**, as English prose. cmux's three agent
+  categories (`turn-complete`, `needs-permission`, `idle-reminder`) arrive
+  already rendered, so the script maps the prose, not a category id.
+- **PATH is `/usr/bin:/bin:/usr/sbin:/sbin`** and none of cmux's own variables
+  are set, so `command -v cmux` finds nothing. The session name is read back
+  out of `cmux list-notifications` — its last field is `pct:<session name>` —
+  using the bundle path `/Applications/cmux.app/Contents/Resources/bin/cmux`.
+
+The body is whatever an agent last printed, and cmux's docs note it can arrive
+from an SSH relay or a cloud machine. It is passed to `osascript` as `on run
+argv` arguments and never interpolated into the AppleScript source, which is
+the one thing those docs tell you not to do. `test/verify.sh` asserts a body
+containing `$(echo pwned)` comes back out as literal text.
+
+### When nothing appears
+
+```sh
+cmux list-notifications     # did cmux record the event at all?
+CMUX_NOTIFICATION_TITLE="Claude Code" CMUX_NOTIFICATION_SUBTITLE="Waiting" \
+    ~/.local/bin/cmux-notify --dry-run    # what would the banner say?
+```
+
+`--dry-run` prints `session|state|body` and posts nothing. If that is right but
+no banner appears, the block is macOS: `osascript` notifications are delivered
+as **Script Editor**, so that is the row to enable in System Settings →
+Notifications.
+
 ## Getting this onto another machine
 
 One line, which is the entire reason the config is spliced rather than seeded:
@@ -188,10 +272,11 @@ One line, which is the entire reason the config is spliced rather than seeded:
 ./install.sh --only cmux
 ```
 
-It rewrites the managed block between its two markers, leaves the rest of
-`~/.config/cmux/cmux.json` — including the ~400-line commented template cmux
-writes on first launch — byte for byte, backs the file up only when something
-actually changed, and reloads a running cmux so the keys apply without a
+It links `~/.local/bin/cmux-notify` first, then rewrites the managed block
+between its two markers, leaves the rest of `~/.config/cmux/cmux.json` —
+including the ~400-line commented template cmux writes on first launch — byte
+for byte, backs the file up only when something actually changed, and reloads
+a running cmux so the keys and the notification wiring apply without a
 restart. Running it twice prints `already up to date` and touches nothing.
 
 Per-machine settings belong in cmux's own Settings UI, **not** in a second copy
