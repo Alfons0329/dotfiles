@@ -766,6 +766,24 @@ section "macOS extras"
 check "homebrew"          "command -v brew"
 check "ghostty app"       "[ -d /Applications/Ghostty.app ]"
 check "ghostty config"    "[ -L $HOME/.config/ghostty/config ]"
+
+# Drag-select must land in the system clipboard, not just a selection clipboard
+# that macOS does not have and Linux does. Asked of Ghostty rather than grepped
+# out of the config file: the comment next to the setting spells out the value
+# it replaced, and `+show-config --changes-only=false` prints the *effective*
+# value after every config-file and `config-file = ?...` include is resolved -
+# which is the thing that has to be `clipboard`.
+read -r -d '' GHOSTTY_COS_CHECK <<'GCOS' || true
+      (
+        gb=$(command -v ghostty 2>/dev/null || true)
+        [ -n "$gb" ] || gb=/Applications/Ghostty.app/Contents/MacOS/ghostty
+        [ -x "$gb" ] || exit 1
+        "$gb" +show-config --changes-only=false --no-pager 2>/dev/null \
+            | grep -qx 'copy-on-select = clipboard'
+      )
+GCOS
+check "ghostty copies a selection to the system clipboard" "$GHOSTTY_COS_CHECK"
+
 # Ghostty exports TERM=xterm-ghostty and ships that terminfo only inside its
 # app bundle. Until it is installed, tmux exits the moment it attaches -
 # "missing or unsuitable terminal: xterm-ghostty" - while `tmux new-session -d`

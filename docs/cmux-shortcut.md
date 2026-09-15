@@ -96,7 +96,11 @@ Mouse selection copies to the clipboard, which is `terminal.copyOnSelect` in the
 same managed block. tmux gets that from `set -g mouse on` plus the
 `MouseDragEnd1Pane` unbind in `~/.tmux.conf.local`, and herdr gets it for free —
 `copy_on_select = true` is already in `herdr --default-config`. cmux is the only
-one of the three that defaults it off.
+one of the three that defaults it off. Plain Ghostty, opened without cmux, gets
+the same behaviour from `copy-on-select = clipboard` in
+`~/.config/ghostty/config` directly — `clipboard` rather than Ghostty's own
+default of `true`, which only reaches the system clipboard on a platform with
+no separate selection clipboard (true of macOS by accident, false on Linux).
 
 ## What you give up
 
