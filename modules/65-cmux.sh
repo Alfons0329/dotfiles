@@ -42,9 +42,10 @@ CMUX_CONFIG="$CMUX_CONFIG_DIR/cmux.json"
 #
 # A cmux action holds exactly ONE binding - the schema's shortcuts.bindings is
 # a string or a two-stroke chord array, never a list of alternatives - so every
-# chord below REPLACES that action's Cmd default. Cmd+T, Cmd+W, Cmd+N, Cmd+B,
-# Cmd+[ and Cmd+] stop firing in cmux as a result. That is the deliberate
-# trade: one keymap across tmux, herdr and cmux.
+# chord below REPLACES that action's Cmd default. Cmd+T, Cmd+W, Cmd+N, Cmd+[
+# and Cmd+] stop firing in cmux as a result. That is the deliberate trade: one
+# keymap across tmux, herdr and cmux. toggleSidebar below is the one
+# deliberate exception - see the comment on it.
 #
 # Keys with no literal spelling are written as their shifted form, because the
 # schema's key grammar accepts [A-Za-z0-9] and ,./\;'`=[]- and nothing else:
@@ -109,8 +110,13 @@ cmux_managed_block() {
       // '&' kills a *window*, which in this map is closeTab above, and a
       // chord that destroys a whole workspace is not one to add by analogy.
 
-      // b matches herdr's <prefix> b for the same sidebar-shaped thing.
-      "toggleSidebar": ["ctrl+b", "b"],
+      // The one action on this page kept off the prefix. toggleSidebar is
+      // cmux's own left sidebar - a real, separate shortcut, not a tmux
+      // stand-in - and tmux has no equivalent action to justify taking cmd+b
+      // away from it the way every other chord here takes a Cmd key. Kept as
+      // a single stroke, not a chord: the schema also accepts one bare key,
+      // which is what cmux's own default already is.
+      "toggleSidebar": "cmd+b",
       // The closest cmux has to tmux's copy-mode. The mouse half of this is
       // terminal.copyOnSelect below.
       "toggleTerminalCopyMode": ["ctrl+b", "["],

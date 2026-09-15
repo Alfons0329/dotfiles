@@ -88,9 +88,14 @@ they are unbound there — a stale habit should do nothing rather than something
 
 | Keys | What it does | Was |
 | --- | --- | --- |
-| `<prefix> b` | toggle the sidebar — same key as herdr | `⌘B` |
 | `<prefix> [` | copy mode | `⌘⇧M` |
 | `<prefix> r` | reload cmux.json **and** the Ghostty config | `⌘⇧,` |
+
+`toggleSidebar` (cmux's own left sidebar) is deliberately **not** on this list.
+It stays on its native `⌘B` rather than moving to `<prefix> b` the way herdr's
+equivalent key would suggest: `⌘B` is a real, separate shortcut people reach
+for constantly, and losing it to a tmux-parity binding with no tmux default to
+justify it is a worse trade than leaving `<prefix> b` unbound.
 
 Mouse selection copies to the clipboard, which is `terminal.copyOnSelect` in the
 same managed block. tmux gets that from `set -g mouse on` plus the
@@ -108,7 +113,7 @@ no separate selection clipboard (true of macOS by accident, false on Linux).
 takes a single shortcut *or* a two-stroke chord — never a list — so an action
 cannot answer to both. After this module runs, in cmux:
 
-- `⌘T`, `⌘W`, `⌘N`, `⌘B`, `⌘R`, `⌘D`, `⌘P` do nothing;
+- `⌘T`, `⌘W`, `⌘N`, `⌘R`, `⌘D`, `⌘P` do nothing;
 - `⌘[` and `⌘]` are free, which is a small win: cmux binds focus-back/forward to
   them by default, and that is what stops a terminal program inside cmux from
   ever seeing those keys.

@@ -715,6 +715,17 @@ if data.get("terminal", {}).get("copyOnSelect") is not True:
     print("terminal.copyOnSelect is not true")
     sys.exit(1)
 
+# toggleSidebar is cmux own left sidebar, not a tmux stand-in, and it is the
+# one action this module deliberately leaves off the prefix - see the comment
+# on it in cmux_managed_block(). Checked by value rather than skipped, so a
+# future edit that quietly moves it back onto ctrl+b (as one earlier version
+# of this file did, to "b") is a parse failure here, not a silent regression
+# a human has to notice by hand on a real keyboard.
+if bindings.get("toggleSidebar") != "cmd+b":
+    print("toggleSidebar is %r, expected the bare string 'cmd+b'" % bindings.get("toggleSidebar"))
+    sys.exit(1)
+bindings = {k: v for k, v in bindings.items() if k != "toggleSidebar"}
+
 # The schema grammar, reduced to what this block uses. A literal % or $ - the
 # obvious thing to type - fails here, which is the point: cmux would take the
 # config, report it valid, and drop the binding.
