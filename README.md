@@ -127,7 +127,7 @@ The README is the starting point; each subsystem has its own page:
 | **[docs/herdr-tmux-analogy.md](docs/herdr-tmux-analogy.md)** | herdr's model for a tmux user: workspace/tab/pane, agent state, and an ordinary day's workflow |
 | **[docs/herdr-shortcut.md](docs/herdr-shortcut.md)** | herdr keys as a diff against oh-my-tmux — the seven that differ, and why the prefix can look dead |
 | **[docs/herdr-loop-eng-tutorial.md](docs/herdr-loop-eng-tutorial.md)** | Running a staged, one-session-per-stage agent workflow on herdr instead of tmux windows |
-| **[docs/cmux-shortcut.md](docs/cmux-shortcut.md)** | cmux driven by the tmux keymap — the full map, and which Cmd keys it costs |
+| **[docs/cmux-shortcut.md](docs/cmux-shortcut.md)** | cmux driven by the tmux keymap — the full map, which Cmd keys it costs, and session-named agent notification banners |
 
 ## Options
 

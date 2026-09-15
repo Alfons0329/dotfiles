@@ -17,6 +17,9 @@ done < <(
     {
         find . -name '*.sh' -not -path './.git/*' -not -path './ref/*'
         echo ./install.sh
+        # No .sh extension because it is a command on PATH, but it is shell and
+        # it runs where nobody is watching - cmux swallows its output entirely.
+        echo ./home/.local/bin/cmux-notify
     } | sort -u
 )
 

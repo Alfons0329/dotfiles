@@ -768,7 +768,7 @@ check "cmux installed"    "command -v cmux && cmux --version"
 check "cmux accepts the deployed config" \
       "cmux config doctor | grep -q 'JSONC syntax is valid'"
 check "cmux config carries the managed keys" \
-      "cmux config doctor | grep -E '^  keys:' | grep -q 'shortcuts' && cmux config doctor | grep -E '^  keys:' | grep -q 'terminal'"
+      "cmux config doctor | grep -E '^  keys:' | grep -q 'shortcuts' && cmux config doctor | grep -E '^  keys:' | grep -q 'terminal' && cmux config doctor | grep -E '^  keys:' | grep -q 'notifications'"
 # The counterpart of the herdr check. cmux rewrites this file itself, so a
 # symlink into the repo would mean the app editing a tracked file in a public
 # checkout.
@@ -817,6 +817,98 @@ if grep -qE '^\s*//\s+"[A-Za-z]+" : ' "$CMUX_CONFIG" 2>/dev/null; then
 else
     skip_check "cmux action ids: no app-written template in cmux.json to check against"
 fi
+
+# Agent notification banners. cmux runs notifications.command once per
+# delivered notification with three variables and nothing else - no argv, no
+# stdin - so the whole path is invisible when it breaks: a missing script, a
+# hook that prints something other than JSON, or a renamed record field all
+# end in "no banner" with nothing logged.
+check "cmux-notify is on PATH and executable" "[ -x $HOME/.local/bin/cmux-notify ]"
+
+# cmux hands notifications.command a PATH of /usr/bin:/bin:/usr/sbin:/sbin and
+# none of its own variables, so `command -v cmux` finds nothing in there and
+# cmux-notify falls back to the bundle path to look the session name up. If
+# that path ever moves, the banner keeps working and quietly loses the name.
+check "the cmux CLI cmux-notify falls back to exists" \
+      "[ -x /Applications/cmux.app/Contents/Resources/bin/cmux ]"
+
+# Behaviour, not presence. The mapping from cmux's English subtitles to a
+# state is the whole job, and the third case is the security-relevant one: the
+# body is agent output, so a command substitution in it has to come back out
+# as literal text rather than having run.
+read -r -d '' CMUX_NOTIFY_CHECK <<'CMUXNOTIFY' || true
+      (
+        out=$(CMUX_NOTIFICATION_TITLE="Claude Code" \
+              CMUX_NOTIFICATION_SUBTITLE="Completed in demo-project" \
+              CMUX_NOTIFICATION_BODY="done" \
+              "$HOME/.local/bin/cmux-notify" --dry-run)
+        [ "$out" = "demo-project|completed|done" ] || exit 1
+
+        out=$(CMUX_NOTIFICATION_TITLE="Claude Code" \
+              CMUX_NOTIFICATION_SUBTITLE="Waiting" \
+              CMUX_NOTIFICATION_BODY="" \
+              "$HOME/.local/bin/cmux-notify" --dry-run)
+        [ "$out" = "Claude Code|needs input|needs input" ] || exit 1
+
+        out=$(CMUX_NOTIFICATION_TITLE="Claude Code" \
+              CMUX_NOTIFICATION_SUBTITLE="Waiting" \
+              CMUX_NOTIFICATION_BODY='said "hi" $(echo pwned)' \
+              "$HOME/.local/bin/cmux-notify" --dry-run)
+        [ "$out" = 'Claude Code|needs input|said "hi" $(echo pwned)' ] || exit 1
+      )
+CMUXNOTIFY
+check "cmux-notify maps agent states onto a session banner" "$CMUX_NOTIFY_CHECK"
+
+# cmux.json has to name the script, and the hook has to return JSON that turns
+# the native banner off - cmux discards a hook that returns anything else and
+# silently reverts to its default behaviour, which is two banners per event.
+# The comment stripper is line-anchored only, not string-aware: it is enough
+# for a file this module writes, because cmux_managed_block() never puts a
+# comment after code on the same line, and neither does cmux's own template.
+read -r -d '' CMUX_HOOK_CHECK <<'CMUXHOOK' || true
+      python3 -c '
+import json, re, subprocess, sys
+
+text = open("'"$CMUX_CONFIG"'").read()
+text = re.sub(r"^\s*//.*$", "", text, flags=re.M)
+text = re.sub(r",(\s*[}\]])", r"\1", text)
+cfg = json.loads(text)
+notif = cfg["notifications"]
+if "cmux-notify" not in notif.get("command", ""):
+    sys.exit(1)
+
+hooks = [h for h in notif.get("hooks", []) if h.get("enabled", True)]
+if not hooks:
+    sys.exit(1)
+
+muted = False
+for hook in hooks:
+    proc = subprocess.run(["/bin/sh", "-c", hook["command"]],
+                          input=b"{}", capture_output=True)
+    out = proc.stdout.strip()
+    if not out:
+        continue
+    patch = json.loads(out)   # not JSON -> raises -> the check fails, as cmux would
+    if patch.get("effects", {}).get("desktop") is False:
+        muted = True
+
+sys.exit(0 if muted else 1)
+'
+CMUXHOOK
+check "cmux hands the banner to cmux-notify and mutes its own" "$CMUX_HOOK_CHECK"
+
+# The lookup in cmux-notify reads the session name out of the last field of a
+# notification record, which is the one part of this that is not documented
+# anywhere. Skipped rather than failed on a machine that has not collected a
+# notification yet - a fresh install has an empty list.
+read -r -d '' CMUX_RECORD_CHECK <<'CMUXRECORD' || true
+      (
+        rows=$(cmux list-notifications 2>/dev/null) || exit 0
+        [ -n "$rows" ] || exit 0
+        printf '%s\n' "$rows" | head -1 | awk -F'|' '{print $NF}' | grep -q '^pct:'
+      )
+CMUXRECORD
+check "cmux notification records still carry the session name" "$CMUX_RECORD_CHECK"
 fi
 
 # ------------------------------------------------------------------
