@@ -156,6 +156,14 @@ for module_file in "${MODULE_FILES[@]}"; do
     # module that follows.
     brew_env
 
+    # ~/.local/bin first, as .zshrc has it: the pinned-nvim shim, the official
+    # Claude Code installer and codegraph all land there. Without this, the
+    # installer's own PATH still resolved Homebrew's nvim 0.9 after the shim
+    # was written (editor module failed), and later modules reported
+    # "Claude Code not found" / "codegraph not on PATH". After brew_env, which
+    # may have just prepended /opt/homebrew/bin ahead of it.
+    path_first "$HOME/.local/bin"
+
     # Modules run in a subshell: one module blowing up cannot corrupt the
     # orchestrator's state, and `set -e` inside a module stays scoped to it.
     # shellcheck source=/dev/null  # module path is resolved at runtime

@@ -25,6 +25,14 @@ install_casks() {
             skip "$c already installed"
             continue
         fi
+        # The same fonts installed by hand (powerline/fonts' install.sh) make
+        # the cask abort with "there is already a Font at ...", and it then
+        # fails on every re-run. The font is present either way.
+        if [ "$c" = "font-roboto-mono-for-powerline" ] && [ "$DRY_RUN" != "1" ] \
+            && [ -e "$HOME/Library/Fonts/Roboto Mono for Powerline.ttf" ]; then
+            skip "$c already present in ~/Library/Fonts (not via brew)"
+            continue
+        fi
         run brew install --cask "$c" || warn "brew install --cask $c failed; continuing."
     done
 }

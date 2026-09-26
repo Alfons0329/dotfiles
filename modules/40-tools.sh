@@ -121,7 +121,14 @@ install_nodejs() {
             skip "Node.js $(node --version) already installed"
             return 0
         fi
-        warn "Node.js $(node --version) is older than v18; installing a current release."
+        # An empty major means node is on PATH but will not start - seen when
+        # a brew upgrade of llhttp left node linked to a dylib that was gone.
+        # Reinstalling fixes both cases; only the message differs.
+        if [ -z "$major" ]; then
+            warn "node is installed but does not run; reinstalling."
+        else
+            warn "Node.js $(node --version) is older than v18; installing a current release."
+        fi
     fi
 
     if is_macos; then
