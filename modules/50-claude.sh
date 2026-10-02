@@ -18,7 +18,10 @@ install_claude_code() {
 
     log "Installing Claude Code..."
     if is_macos && have brew; then
-        run brew install --cask claude && return 0
+        # claude-code, not claude: the `claude` cask is the 376 MB desktop
+        # app, which provides no `claude` CLI - herdr and codegraph then
+        # both reported "Claude Code not found" right after this "succeeded".
+        run brew install --cask claude-code && return 0
         warn "Homebrew cask install failed; trying the official installer."
     fi
 

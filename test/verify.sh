@@ -53,6 +53,12 @@ check "bat (or batcat shim)" "command -v bat || command -v batcat"
 check "node >= 18"           '[ "$(node --version | sed "s/^v\([0-9]*\).*/\1/")" -ge 18 ]'
 check "gh (GitHub CLI)"      "command -v gh && gh --version"
 check "gws (Google Workspace CLI)" "command -v gws && gws --version"
+check "lnav (log viewer)"    "command -v lnav"
+# tspin is a cargo install, so it lands in ~/.cargo/bin, which only .zshrc puts
+# on PATH. Piped a line rather than asked for --version: the job is reading a
+# stream, and the text has to survive the highlighting intact.
+check "tspin highlights a piped log line" \
+      "printf 'ERROR boom\n' | \"\$(command -v tspin || echo $HOME/.cargo/bin/tspin)\" | grep -q boom"
 
 # ------------------------------------------------------------------
 section "Search tools"
@@ -147,6 +153,51 @@ check "unknown TERM falls back to a usable entry" \
 # collapsed a 24-bit Neovim into the terminal's 8-colour ANSI palette.
 check "docker's bare TERM=xterm is upgraded" \
       "TERM=xterm zsh -ic 'echo \$TERM' 2>/dev/null | tr -d '\\r' | grep -qx xterm-256color"
+
+# `cmo` and `y` are only defined when cmux / yazi are on PATH, so each check
+# puts a stub binary on PATH to get the wrapper defined at all. The stub alone
+# is not enough: .zshrc rebuilds PATH with the system dirs first and $path
+# last, so on a Mac that has the real cmux the wrapper would reach it - and
+# the real one opens a GUI panel. A shell function of the same name, defined
+# after .zshrc has loaded, wins over any binary, so that is what answers.
+#
+# `cmo` is a one-line wrapper, so the failure that matters is the argument
+# landing in the wrong place in the subcommand, not "does it exist".
+read -r -d '' CMO_CHECK <<'CMOCHECK' || true
+      (
+        _bin=$(mktemp -d) || exit 1
+        trap 'rm -rf "$_bin"' EXIT
+        printf '#!/bin/sh\nexit 0\n' > "$_bin/cmux"
+        chmod +x "$_bin/cmux"
+        out=$(PATH="$_bin:$PATH" zsh -ic 'cmux() { print -r -- "$*"; }; cmo notes.md' 2>/dev/null)
+        [ "$out" = "markdown open notes.md" ]
+      )
+CMOCHECK
+check "cmo opens a markdown file via cmux's viewer" "$CMO_CHECK"
+
+# `y` reads back the directory yazi wrote to --cwd-file and cd's the calling
+# shell there - the entire point of the wrapper, since a plain `yazi`
+# subprocess exiting leaves the shell exactly where it started. The stand-in
+# writes a known directory to that file, as the real binary does on quit.
+read -r -d '' Y_CHECK <<'YCHECK' || true
+      (
+        _bin=$(mktemp -d) || exit 1
+        _dest=$(cd "$(mktemp -d)" && pwd -P) || exit 1
+        trap 'rm -rf "$_bin" "$_dest"' EXIT
+        printf '#!/bin/sh\nexit 0\n' > "$_bin/yazi"
+        chmod +x "$_bin/yazi"
+        out=$(Y_DEST="$_dest" PATH="$_bin:$PATH" zsh -ic '
+          yazi() {
+            local a
+            for a in "$@"; do
+              case $a in --cwd-file=*) print -rn -- "$Y_DEST" > "${a#--cwd-file=}" ;; esac
+            done
+          }
+          y >/dev/null 2>&1; pwd -P' 2>/dev/null)
+        [ "$out" = "$_dest" ]
+      )
+YCHECK
+check "y lands the shell in the directory yazi quit into" "$Y_CHECK"
 
 # ------------------------------------------------------------------
 section "tmux"
@@ -989,8 +1040,12 @@ section "No secrets in tracked config"
 # ~/.zshrc is a tracked, world-readable file in a public repo. Anything
 # resembling a credential in it is a defect; credentials belong in
 # ~/.zshrc.local, which is gitignored.
+# The name pattern allows hyphens and digits, not just [A-Z_]: a line such as
+# `export my-token=...` slips past the narrower version. A hyphen is not legal
+# in a shell identifier, so that line does not even work - but the value still
+# sits in a world-readable file in a public repo.
 check "no exported tokens/secrets/keys in .zshrc" \
-      "! grep -qEi 'export[[:space:]]+[A-Z_]*(TOKEN|SECRET|PASSWORD|APIKEY|API_KEY)[[:space:]]*=' $HOME/.zshrc"
+      "! grep -qEi 'export[[:space:]]+[A-Za-z0-9_-]*(TOKEN|SECRET|PASSWORD|PASSWD|APIKEY|API_KEY|CREDENTIAL)[[:space:]]*=' $HOME/.zshrc"
 check ".zshrc sources ~/.zshrc.local" \
       "grep -q 'zshrc.local' $HOME/.zshrc"
 

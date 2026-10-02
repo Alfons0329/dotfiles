@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# modules/40-tools.sh - fzf (with shell key bindings), Node.js, gh, gws.
+# modules/40-tools.sh - fzf (with shell key bindings), Node.js, gh, gws, rust/tailspin.
 #
 # ag and ripgrep come from the package manifests; this module handles the
 # tools that need more than an install line.
@@ -121,7 +121,14 @@ install_nodejs() {
             skip "Node.js $(node --version) already installed"
             return 0
         fi
-        warn "Node.js $(node --version) is older than v18; installing a current release."
+        # An empty major means node is on PATH but will not start - seen when
+        # a brew upgrade of llhttp left node linked to a dylib that was gone.
+        # Reinstalling fixes both cases; only the message differs.
+        if [ -z "$major" ]; then
+            warn "node is installed but does not run; reinstalling."
+        else
+            warn "Node.js $(node --version) is older than v18; installing a current release."
+        fi
     fi
 
     if is_macos; then
@@ -213,12 +220,50 @@ install_gws() {
     fi
 }
 
+# ------------------------------------------------------------------
+# rustup + tailspin
+#
+# https://github.com/bensadeh/tailspin - colorizes any piped stream (log
+# levels, timestamps, IPs, UUIDs, HTTP verbs/status, paths, key=value) with
+# zero config, so `ssh nas 'tail -f ...' | tspin` reads like MobaXterm's
+# built-in log highlighting. It ships only as a cargo crate, hence rustup.
+#
+# Deliberately the official rustup.rs script rather than the brew formula:
+# brew's rustup is keg-only and (as of 1.29.1) does not install the
+# cargo/rustc proxy shims into ~/.cargo/bin - `cargo --version` just prints
+# rustup's own banner. The official installer creates real proxy binaries
+# there, which is also why this needs no extra `path` entry: ~/.cargo/bin is
+# already in the array above. Same script on macOS and Linux, same reasoning
+# as install_gws.
+# ------------------------------------------------------------------
+install_rust_tools() {
+    if ! have rustup; then
+        log "Installing rustup..."
+        run_sh "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain stable" \
+            || { warn "rustup install failed; skipping tailspin."; return 0; }
+    fi
+
+    local cargo_bin="$HOME/.cargo/bin/cargo"
+    if [ ! -x "$cargo_bin" ] && [ "$DRY_RUN" != "1" ]; then
+        warn "cargo not found after rustup install; skipping tailspin."
+        return 0
+    fi
+
+    if have tspin; then
+        skip "tailspin already installed"
+        return 0
+    fi
+    log "Installing tailspin (tspin)..."
+    run "$cargo_bin" install tailspin || warn "cargo install of tailspin failed."
+}
+
 main() {
     install_fzf
     install_fd
     install_nodejs
     install_gh
     install_gws
+    install_rust_tools
 }
 
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then

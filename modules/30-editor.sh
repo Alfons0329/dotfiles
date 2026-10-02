@@ -184,7 +184,11 @@ ensure_pinned_nvim_wins() {
     warn "  Adding ~/.local/bin/nvim so the pinned build wins."
     run mkdir -p "$HOME/.local/bin"
     run ln -sf "$NVIM_BIN" "$HOME/.local/bin/nvim"
-    hash -r 2>/dev/null || true
+    # The shim only wins if ~/.local/bin is ahead of /opt/homebrew/bin in
+    # *this* process too. install.sh arranges that, but a standalone run of
+    # this module inherits whatever PATH the caller had - and the version
+    # check below then died on Homebrew's 0.9 right after writing the shim.
+    path_first "$HOME/.local/bin"
 }
 
 check_neovim_version() {

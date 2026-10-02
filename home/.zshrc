@@ -115,6 +115,8 @@ path=(
     "$HOME/.cargo/bin"
     "$HOME/go/bin"
     /usr/local/go/bin
+    /opt/homebrew/opt/rustup/bin   # rustup itself: brew keg-only, conflicts with rust formula
+    "$HOME/.rustup/toolchains/stable-aarch64-apple-darwin/bin"   # brew's rustup ships no cargo/rustc proxies in ~/.cargo/bin
     $path
 )
 # Drop entries that don't exist on this machine, and de-duplicate.
@@ -174,7 +176,60 @@ alias gpp='git log --pretty=format:"%h%x09%an%x09%ad%x09%s"'
 # Search: ag for interactive greps, rg where speed matters most.
 alias agi='ag -i'
 
+# cmo <file.md> - open a markdown file in cmux's formatted, live-reloading
+# viewer panel (`cmux markdown open <path>`). Guarded like thefuck below: on a
+# machine without cmux this would just be a function that fails with "command
+# not found: cmux" on every invocation for no benefit.
+(( $+commands[cmux] )) && cmo() { cmux markdown open "$1"; }
+
+# y - open yazi's file browser and cd the shell to wherever it lands on quit.
+# Wrapper straight from yazi's own docs: `yazi` is a plain subprocess, so on
+# its own it can browse to a directory and exit without the calling shell ever
+# moving - this is the only reason `y` exists rather than an alias.
+if (( $+commands[yazi] )); then
+    y() {
+        local tmp="$(mktemp -t "yazi-cwd.XXXXXX")" cwd
+        yazi "$@" --cwd-file="$tmp"
+        if cwd="$(command cat -- "$tmp")" && [ -n "$cwd" ] && [ "$cwd" != "$PWD" ]; then
+            builtin cd -- "$cwd"
+        fi
+        rm -f -- "$tmp"
+    }
+fi
+
+# rtail <host> [path] - MobaXterm-style colorized `tail -f` over SSH. ERROR/
+# WARN, timestamps, IPs, UUIDs and paths get highlighted by tspin on this end;
+# nothing installs on the remote host, which is assumed POSIX. The path default
+# is a guess - pass one explicitly for anything that isn't syslog.
+if (( $+commands[tspin] )); then
+    rtail() {
+        local host="$1" path="$2"
+        if [ -z "$host" ]; then
+            print -u2 "usage: rtail <host> [path]"
+            return 1
+        fi
+        ssh "$host" "tail -n 200 -f '${path:-/var/log/syslog}'" | tspin
+    }
+fi
+
+# rlnav <host> <path> - pull a remote log through lnav for actual
+# investigation (format autodetect, SQL queries, timeline) rather than a live
+# follow. Complement to rtail above, not a replacement.
+if (( $+commands[lnav] )); then
+    rlnav() {
+        if [ -z "$1" ] || [ -z "$2" ]; then
+            print -u2 "usage: rlnav <host> <path>"
+            return 1
+        fi
+        ssh "$1" "cat '$2'" | lnav -
+    }
+fi
+
 (( $+commands[thefuck] )) && eval "$(thefuck --alias)"
+
+# Above the .zshrc.local source, not below it, so one machine can still pin a
+# different model there without editing a tracked file.
+export CLAUDE_DEFAULT_MODEL=claude-opus-5-5
 
 # -------------------------------------------------------------------
 # Machine-local overrides. Keep tokens, credentials and employer-specific

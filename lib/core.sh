@@ -60,6 +60,20 @@ confirm() {
 : "${POWERLINE:=0}"      # 1 = use the bullet-train zsh theme instead of starship
 : "${FORCE_PKG_MGR:=}"   # override OS detection, for dry-run inspection
 
+# Homebrew 7 made "ask mode" the default: any install whose plan pulls in
+# dependencies or dependents stops at "Do you want to proceed? [y/n]". On an
+# existing Mac `brew install node` upgraded node plus 13 deps and gemini-cli,
+# and sat at that prompt under --yes. The manifests already say what gets
+# installed, so the prompt adds nothing here.
+#
+# NO_AUTO_UPDATE: 00-packages.sh runs `brew update` once, explicitly (which
+# ignores this). Without it, every later `brew install` re-downloaded the
+# 15.6 MB API JSON once the cache was 450 s old - once per cask on a slow link.
+# A missing cache is still fetched, so a fresh Mac is unaffected.
+: "${HOMEBREW_NO_ASK:=1}"
+: "${HOMEBREW_NO_AUTO_UPDATE:=1}"
+export HOMEBREW_NO_ASK HOMEBREW_NO_AUTO_UPDATE
+
 CURL_OPTS="-fsSL"
 GIT_SSL_ENV=""
 
@@ -179,6 +193,20 @@ brew_env() {
         fi
     done
     return 0
+}
+
+# path_first <dir> - move (or add) dir to the front of PATH for this process.
+#
+# Moves rather than skips when already present: `brew shellenv` prepends
+# /opt/homebrew/bin, so ~/.local/bin could be on PATH yet still lose to
+# Homebrew's own nvim 0.9 - the pinned-build shim was written and ignored.
+path_first() {
+    local dir="$1" p=":$PATH:"
+    p="${p//:$dir:/:}"
+    p="${p#:}"; p="${p%:}"
+    PATH="$dir${p:+:$p}"
+    export PATH
+    hash -r 2>/dev/null || true
 }
 
 is_macos() { [ "$PKG_MGR" = "brew" ]; }
