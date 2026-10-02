@@ -53,6 +53,12 @@ check "bat (or batcat shim)" "command -v bat || command -v batcat"
 check "node >= 18"           '[ "$(node --version | sed "s/^v\([0-9]*\).*/\1/")" -ge 18 ]'
 check "gh (GitHub CLI)"      "command -v gh && gh --version"
 check "gws (Google Workspace CLI)" "command -v gws && gws --version"
+check "lnav (log viewer)"    "command -v lnav"
+# tspin is a cargo install, so it lands in ~/.cargo/bin, which only .zshrc puts
+# on PATH. Piped a line rather than asked for --version: the job is reading a
+# stream, and the text has to survive the highlighting intact.
+check "tspin highlights a piped log line" \
+      "printf 'ERROR boom\n' | \"\$(command -v tspin || echo $HOME/.cargo/bin/tspin)\" | grep -q boom"
 
 # ------------------------------------------------------------------
 section "Search tools"

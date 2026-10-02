@@ -34,6 +34,10 @@ jq
 tig
 bat
 
+# log viewer: auto-detects log format, colorizes by level/IP/timestamp,
+# SQL-queryable - deep-dive complement to tspin (modules/40-tools.sh)
+lnav
+
 # runtime for Claude Code tooling and several language servers
 node
 
