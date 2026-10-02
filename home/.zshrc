@@ -176,6 +176,27 @@ alias gpp='git log --pretty=format:"%h%x09%an%x09%ad%x09%s"'
 # Search: ag for interactive greps, rg where speed matters most.
 alias agi='ag -i'
 
+# cmo <file.md> - open a markdown file in cmux's formatted, live-reloading
+# viewer panel (`cmux markdown open <path>`). Guarded like thefuck below: on a
+# machine without cmux this would just be a function that fails with "command
+# not found: cmux" on every invocation for no benefit.
+(( $+commands[cmux] )) && cmo() { cmux markdown open "$1"; }
+
+# y - open yazi's file browser and cd the shell to wherever it lands on quit.
+# Wrapper straight from yazi's own docs: `yazi` is a plain subprocess, so on
+# its own it can browse to a directory and exit without the calling shell ever
+# moving - this is the only reason `y` exists rather than an alias.
+if (( $+commands[yazi] )); then
+    y() {
+        local tmp="$(mktemp -t "yazi-cwd.XXXXXX")" cwd
+        yazi "$@" --cwd-file="$tmp"
+        if cwd="$(command cat -- "$tmp")" && [ -n "$cwd" ] && [ "$cwd" != "$PWD" ]; then
+            builtin cd -- "$cwd"
+        fi
+        rm -f -- "$tmp"
+    }
+fi
+
 # rtail <host> [path] - MobaXterm-style colorized `tail -f` over SSH. ERROR/
 # WARN, timestamps, IPs, UUIDs and paths get highlighted by tspin on this end;
 # nothing installs on the remote host, which is assumed POSIX. The path default

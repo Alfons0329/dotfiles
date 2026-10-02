@@ -38,6 +38,11 @@ bat
 # SQL-queryable - deep-dive complement to tspin (modules/40-tools.sh)
 lnav
 
+# terminal file manager; the `y` wrapper in .zshrc cd's the shell to wherever
+# it quits. Not in apt.txt: Ubuntu 22.04 does not package it, so on the build
+# server `y` is simply never defined.
+yazi
+
 # runtime for Claude Code tooling and several language servers
 node
 
