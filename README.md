@@ -197,8 +197,11 @@ explorer, indent guides, terminal, lazygit, symbol highlighting),
 native LSP via
 [nvim-lspconfig](https://github.com/neovim/nvim-lspconfig) +
 [mason](https://github.com/williamboman/mason.nvim), completion via
-[blink.cmp](https://github.com/saghen/blink.cmp), and
-[copilot.lua](https://github.com/zbirenbaum/copilot.lua).
+[blink.cmp](https://github.com/saghen/blink.cmp),
+[copilot.lua](https://github.com/zbirenbaum/copilot.lua), and
+[markdown-preview.nvim](https://github.com/iamcco/markdown-preview.nvim)
+(`:MarkdownPreviewToggle` in a markdown buffer opens a live preview in the
+browser).
 
 One plugin does a lot of that work: snacks replaces what used to be telescope,
 plenary, telescope-fzf-native and nvim-tree. That is worth it here for a reason

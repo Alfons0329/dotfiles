@@ -363,6 +363,37 @@ for plugin in snacks.nvim lualine.nvim bufferline.nvim \
 done
 check "plugin: $CS_PLUGIN (theme)" "[ -d $HOME/.local/share/nvim/lazy/$CS_PLUGIN ]"
 
+# markdown-preview.nvim is checked by the two things that actually broke, not by
+# its directory. Its build hook downloads a prebuilt server binary, and the
+# spec the upstream README gives fails on a first install with
+# `E117: Unknown function: mkdp#util#install` - the plugin ends up cloned, with
+# a directory that looks fine, and no binary to serve the preview.
+read -r -d '' MKDP_BIN_CHECK <<'MKDPBIN' || true
+      (
+        _dir="$HOME/.local/share/nvim/lazy/markdown-preview.nvim/app/bin"
+        [ -d "$_dir" ] || exit 1
+        for _b in "$_dir"/markdown-preview-*; do
+            [ -x "$_b" ] && exit 0
+        done
+        exit 1
+      )
+MKDPBIN
+check "markdown preview server binary is installed" "$MKDP_BIN_CHECK"
+
+# Opens a real markdown buffer, because the plugin is lazy-loaded on `ft` and
+# on its own commands - neither fires under a bare `--headless +qa`, so a spec
+# that never loads would pass a startup check.
+read -r -d '' MKDP_CMD_CHECK <<'MKDPCMD' || true
+      (
+        _md="$(mktemp -d)/probe.md"
+        printf '# probe\n' > "$_md"
+        _out="$(nvim --headless "$_md" -c 'echo exists(":MarkdownPreviewToggle")' -c qa 2>&1)"
+        rm -rf "$(dirname "$_md")"
+        case "$_out" in *2*) exit 0 ;; *) exit 1 ;; esac
+      )
+MKDPCMD
+check "MarkdownPreviewToggle is defined in a markdown buffer" "$MKDP_CMD_CHECK"
+
 # snacks replaced these four. Assert they are gone rather than merely unused, so
 # a stale lazy directory cannot quietly reintroduce a second file tree or a
 # second fuzzy finder competing for the same keys.
