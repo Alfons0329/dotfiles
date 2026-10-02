@@ -1040,8 +1040,12 @@ section "No secrets in tracked config"
 # ~/.zshrc is a tracked, world-readable file in a public repo. Anything
 # resembling a credential in it is a defect; credentials belong in
 # ~/.zshrc.local, which is gitignored.
+# The name pattern allows hyphens and digits, not just [A-Z_]: a line such as
+# `export my-token=...` slips past the narrower version. A hyphen is not legal
+# in a shell identifier, so that line does not even work - but the value still
+# sits in a world-readable file in a public repo.
 check "no exported tokens/secrets/keys in .zshrc" \
-      "! grep -qEi 'export[[:space:]]+[A-Z_]*(TOKEN|SECRET|PASSWORD|APIKEY|API_KEY)[[:space:]]*=' $HOME/.zshrc"
+      "! grep -qEi 'export[[:space:]]+[A-Za-z0-9_-]*(TOKEN|SECRET|PASSWORD|PASSWD|APIKEY|API_KEY|CREDENTIAL)[[:space:]]*=' $HOME/.zshrc"
 check ".zshrc sources ~/.zshrc.local" \
       "grep -q 'zshrc.local' $HOME/.zshrc"
 
