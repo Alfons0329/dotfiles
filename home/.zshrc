@@ -227,6 +227,10 @@ fi
 
 (( $+commands[thefuck] )) && eval "$(thefuck --alias)"
 
+# Above the .zshrc.local source, not below it, so one machine can still pin a
+# different model there without editing a tracked file.
+export CLAUDE_DEFAULT_MODEL=claude-opus-5-5
+
 # -------------------------------------------------------------------
 # Machine-local overrides. Keep tokens, credentials and employer-specific
 # aliases here - this file is gitignored and never leaves the machine.
