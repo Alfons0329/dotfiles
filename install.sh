@@ -33,6 +33,7 @@ usage() {
     cat <<'EOF'
 
 Modules (in run order):
+  network    macOS only: Cloudflare WARP proxy, so GitHub downloads skip a slow route
   packages   system packages, locale
   shell      zsh, oh-my-zsh, theme, plugins
   tmux       oh-my-tmux + tmux-resurrect
@@ -155,6 +156,7 @@ for module_file in "${MODULE_FILES[@]}"; do
     # the orchestrator's own process, is what makes the PATH stick for every
     # module that follows.
     brew_env
+    warp_env
 
     # ~/.local/bin first, as .zshrc has it: the pinned-nvim shim, the official
     # Claude Code installer and codegraph all land there. Without this, the

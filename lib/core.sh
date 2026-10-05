@@ -209,6 +209,34 @@ path_first() {
     hash -r 2>/dev/null || true
 }
 
+# ------------------------------------------------------------------
+# warp_env - route this process's HTTPS through the WARP proxy, if it is up.
+#
+# modules/00-network.sh starts Cloudflare WARP in proxy mode; this is what makes
+# the rest of the run use it. Called from install.sh's module loop next to
+# brew_env, for the same reason: modules run in subshells, so an export made
+# inside module 00 would die with it.
+#
+# HTTPS_PROXY with an http:// URL rather than ALL_PROXY=socks5h://: WARP's port
+# speaks both, and a SOCKS URL makes Python's requests fail outright without
+# PySocks. Both cases: curl reads only the lowercase http_proxy but accepts
+# either for HTTPS; other tools disagree. Darwin only, because on a build server
+# something unrelated could be listening on 40000. An existing proxy setting
+# (a corporate one, see --insecure) always wins.
+# ------------------------------------------------------------------
+WARP_PROXY_PORT=40000
+
+warp_env() {
+    [ "$(uname -s)" = "Darwin" ] || return 0
+    [ -z "${HTTPS_PROXY:-}${https_proxy:-}${ALL_PROXY:-}${all_proxy:-}" ] || return 0
+    (exec 3<>"/dev/tcp/127.0.0.1/$WARP_PROXY_PORT") 2>/dev/null || return 0
+
+    HTTPS_PROXY="http://127.0.0.1:$WARP_PROXY_PORT"
+    https_proxy="$HTTPS_PROXY"
+    export HTTPS_PROXY https_proxy
+    log "Routing HTTPS through Cloudflare WARP ($HTTPS_PROXY)."
+}
+
 is_macos() { [ "$PKG_MGR" = "brew" ]; }
 is_linux() { [ "$PKG_MGR" = "apt" ]; }
 

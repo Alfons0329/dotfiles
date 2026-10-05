@@ -89,6 +89,12 @@ under `/bin/bash` 3.2.
 macOS is covered by dry-run and shellcheck only — no VM. Specifically unverified:
 
 - `modules/70-ghostty.sh` has never actually run (needs Xcode ≤ 26.3).
+- `modules/00-network.sh` has only run against a Mac that already had WARP
+  (cask) registered. The fresh path — `.pkg` install, daemon start, registration
+  without the GUI onboarding — is unverified; so is whether proxy mode needs
+  the macOS VPN-profile approval prompt. Known quirk: after CLI registration
+  the menu-bar app sat on "Setting things up…" while the proxy already worked;
+  relaunching the app (`open -a "Cloudflare WARP"`) cleared it.
 - The iTerm2 `Cmd+Shift+F` keymap encoding `"0x46-0x120000"` is a best reading of
   iTerm2's plist format. If it does not fire, bind it once in the GUI and read
   the real key back out of `~/Library/Preferences/com.googlecode.iterm2.plist`.

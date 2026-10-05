@@ -182,6 +182,21 @@ alias agi='ag -i'
 # not found: cmux" on every invocation for no benefit.
 (( $+commands[cmux] )) && cmo() { cmux markdown open "$1"; }
 
+# brew - go through Cloudflare WARP's local proxy whenever it is up. On HiNet,
+# `brew fetch --force ripgrep` took 64 s direct and 1 s through WARP: ghcr.io
+# bottles crawled at 30-190 KB/s on a 1 Gbps line. Per-command rather than an
+# exported HTTPS_PROXY, so a disconnected WARP never breaks every other https
+# client in the shell. modules/00-network.sh sets WARP up on port 40000.
+if [[ $OSTYPE == darwin* ]] && (( $+commands[warp-cli] )); then
+    brew() {
+        if [[ -z $HTTPS_PROXY$https_proxy ]] && nc -z 127.0.0.1 40000 2>/dev/null; then
+            HTTPS_PROXY=http://127.0.0.1:40000 https_proxy=http://127.0.0.1:40000 command brew "$@"
+        else
+            command brew "$@"
+        fi
+    }
+fi
+
 # y - open yazi's file browser and cd the shell to wherever it lands on quit.
 # Wrapper straight from yazi's own docs: `yazi` is a plain subprocess, so on
 # its own it can browse to a directory and exit without the calling shell ever

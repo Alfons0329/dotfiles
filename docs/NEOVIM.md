@@ -154,16 +154,20 @@ a preview rather than a quickfix window.
 | VSCode | Neovim | What it does |
 | --- | --- | --- |
 | suggestion popup | automatic | blink.cmp completes as you type |
-| cycle suggestion | `<Tab>` / `<S-Tab>` | move through the menu |
-| accept | `<CR>` | accept the selected completion |
+| move in the menu | `<Up>` / `<Down>` | previous / next suggestion |
+| accept | `<Tab>` or `<CR>` | accept the highlighted completion |
 | trigger manually | `<C-Space>` | open the menu / its docs |
-| accept Copilot | `<C-j>` | (Tab is taken by completion) |
+| accept Copilot | `<Tab>` (no menu open) or `<C-j>` | accept the grey ghost text |
 | cycle Copilot | `<M-]>` / `<M-[>` | next / prev Copilot suggestion |
 | dismiss Copilot | `<C-]>` | dismiss |
 
-Copilot's accept is `<C-j>` rather than Tab precisely so it can't fight
-blink.cmp's Tab-to-cycle — two plugins competing for one key is the same class
-of mistake as two plugins fighting over the statusline.
+The first item is pre-highlighted, so typing `A` and pressing Tab takes the top
+match, exactly as in VSCode. With no menu open, Tab jumps to the next snippet
+placeholder, then accepts Copilot's ghost text, then inserts a real tab.
+
+Tab is owned by blink.cmp alone (`plugins/lsp.lua`); Copilot is reached through
+blink's chain rather than mapping Tab itself — two plugins competing for one key
+is the same class of mistake as two plugins fighting over the statusline.
 
 ## Editing helpers
 

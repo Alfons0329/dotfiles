@@ -4,9 +4,10 @@
 -- Nothing in install.sh can do this for you, so it is listed in the
 -- post-install steps.
 --
--- Suggestions are accepted with Ctrl-J rather than Tab, because Tab already
--- cycles blink.cmp's completion menu. Two plugins competing for Tab is the
--- same class of mistake as two plugins competing for the statusline.
+-- Tab accepts a suggestion, as in VSCode, but through blink.cmp's Tab chain in
+-- plugins/lsp.lua (menu item, then snippet, then Copilot) rather than a mapping
+-- of its own: two plugins competing for Tab is the same class of mistake as two
+-- plugins competing for the statusline. Ctrl-J below is kept as a direct accept.
 --
 -- Cycling moved off <C-.>/<C-,> to <M-]>/<M-[>, which frees <C-.> for the LSP
 -- code action - VSCode's quick-fix key.

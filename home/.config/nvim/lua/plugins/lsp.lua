@@ -6,6 +6,16 @@
 --   gd  definition      gy  type definition
 --   gi  implementation  gr  references        K  hover
 
+-- blink runs each keymap entry in order and stops at the first that returns
+-- true. copilot.lua is lazy (InsertEnter), so it may not be loaded yet.
+local function copilot_accept()
+    local ok, s = pcall(require, "copilot.suggestion")
+    if ok and s.is_visible() then
+        s.accept()
+        return true
+    end
+end
+
 return {
     {
         "williamboman/mason.nvim",
@@ -117,10 +127,18 @@ return {
         opts = {
             keymap = {
                 preset = "default",
-                -- Tab/Shift-Tab to cycle and Enter to accept, matching the old
-                -- coc.nvim mappings.
-                ["<Tab>"]   = { "select_next", "snippet_forward", "fallback" },
-                ["<S-Tab>"] = { "select_prev", "snippet_backward", "fallback" },
+                -- VSCode semantics: arrows move through the menu, Tab and Enter
+                -- accept the highlighted item. Tab used to cycle (select_next),
+                -- so picking the second entry meant Tab, then a separate key to
+                -- confirm. The arrows are spelled out rather than left to the
+                -- preset so they can't silently change with a blink upgrade.
+                ["<Up>"]    = { "select_prev", "fallback" },
+                ["<Down>"]  = { "select_next", "fallback" },
+                -- With no menu, Tab falls through to the snippet, then to
+                -- Copilot's ghost text (VSCode accepts that on Tab too), then
+                -- to a literal Tab.
+                ["<Tab>"]   = { "accept", "snippet_forward", copilot_accept, "fallback" },
+                ["<S-Tab>"] = { "snippet_backward", "fallback" },
                 ["<CR>"]    = { "accept", "fallback" },
                 ["<C-Space>"] = { "show", "show_documentation", "hide_documentation" },
             },

@@ -568,6 +568,11 @@ check "snacks grep_word available (word-under-cursor search)" \
 # break jumplist-forward. Editor tabs use Ctrl+PageDown / Ctrl+Tab instead.
 check "bare Tab left unmapped (jumplist intact)" \
       "[ -z \"\$(nvim --headless -c 'lua io.write(vim.fn.maparg(\"<Tab>\",\"n\"))' -c qa 2>&1)\" ]"
+# VSCode completion keys: Tab accepts the highlighted item instead of cycling.
+# Asked of blink's resolved keymap (preset merged in) rather than grepped out of
+# lsp.lua, whose own comment mentions select_next.
+check "Tab accepts completion, Enter accepts, S-Tab no longer cycles" \
+      "nvim --headless -c 'lua require(\"lazy\").load({plugins={\"blink.cmp\"}}); local k=require(\"blink.cmp.config\").keymap; io.write(tostring(k[\"<Tab>\"][1]==\"accept\" and k[\"<CR>\"][1]==\"accept\" and not vim.tbl_contains(k[\"<S-Tab>\"],\"select_prev\")))' -c qa 2>&1 | grep -q true"
 
 # ------------------------------------------------------------------
 section "Plain vim is independent of Neovim"
